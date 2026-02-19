@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #a855f7;
+  --color-accent-pink: #ec4899;
+  --color-accent-start: #9333ea;
+  --color-accent-end: #ec4899;
+  --color-background-light: #f6f7f8;
+  --color-background-dark: #0f1419;
+  --color-card-dark: #181f26;
+  --color-border-dark: #2a343f;
+  --font-display: "Inter", sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: "Inter", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+.bg-gradient-accent {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.vibrant-gradient {
+  background: linear-gradient(135deg, #9333ea 0%, #ec4899 100%);
+}
+
+.vibrant-gradient-soft {
+  background: linear-gradient(
+    135deg,
+    rgba(147, 51, 234, 0.2) 0%,
+    rgba(236, 72, 153, 0.2) 100%
+  );
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
