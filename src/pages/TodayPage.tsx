@@ -1,11 +1,28 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, buildStabilizerStack } from "../db";
+import { db, buildStabilizerStack, getWaitingTasks, isActionable, nowISO } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
 import QuickEntryModal from "../components/QuickEntryModal";
 
 type Tab = "Stabilizer" | "Builder";
+
+function daysUntil(dateStr: string): number {
+  return Math.ceil(
+    (new Date(dateStr).getTime() - Date.now()) / 86_400_000
+  );
+}
+
+function formatNextAction(dateStr: string): string {
+  const days = daysUntil(dateStr);
+  const formatted = new Date(dateStr).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  if (days <= 0) return `${formatted} (today)`;
+  if (days === 1) return `${formatted} (tomorrow)`;
+  return `${formatted} (in ${days} days)`;
+}
 
 export default function TodayPage() {
   const settings = useLiveQuery(() => db.appSettings.get("default"));
@@ -13,6 +30,7 @@ export default function TodayPage() {
   const allTasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
   const [showModal, setShowModal] = useState(false);
   const [tab, setTab] = useState<Tab>("Stabilizer");
+  const [waitingOpen, setWaitingOpen] = useState(false);
   const timer = useTimer();
 
   const availMins = settings?.availableMinutes ?? 120;
@@ -22,15 +40,20 @@ export default function TodayPage() {
     [allTasks, categories, availMins]
   );
 
-  const builderTasks = useMemo(
+  const builderActionable = useMemo(
     () =>
       allTasks.filter(
-        (t) => t.domain === "BUSINESS" && t.status !== "DONE"
+        (t) => t.domain === "BUSINESS" && isActionable(t)
       ),
     [allTasks]
   );
 
-  const todayTasks = tab === "Stabilizer" ? stabilizerTasks : builderTasks;
+  const waitingTasks = useMemo(
+    () => getWaitingTasks(allTasks, tab === "Stabilizer" ? "LIFE_ADMIN" : "BUSINESS"),
+    [allTasks, tab]
+  );
+
+  const todayTasks = tab === "Stabilizer" ? stabilizerTasks : builderActionable;
 
   const allocatedMins = todayTasks.reduce(
     (s, t) => s + (t.estimateMinutes ?? 0),
@@ -38,6 +61,15 @@ export default function TodayPage() {
   );
   const pct = Math.min((allocatedMins / Math.max(availMins, 1)) * 100, 100);
   const catMap = new Map(categories.map((c) => [c.id, c]));
+
+  const makeActionable = async (taskId: string) => {
+    await db.tasks.update(taskId, {
+      status: "BACKLOG",
+      nextActionAt: undefined,
+      pendingReason: undefined,
+      updatedAt: nowISO(),
+    });
+  };
 
   return (
     <div className="flex flex-1 justify-center py-8 px-4 md:px-0 pb-24 md:pb-8">
@@ -64,7 +96,7 @@ export default function TodayPage() {
               <button
                 key={t}
                 type="button"
-                onClick={() => setTab(t)}
+                onClick={() => { setTab(t); setWaitingOpen(false); }}
                 className={`flex cursor-pointer h-12 flex-1 items-center justify-center overflow-hidden rounded-lg px-4 transition-all text-sm font-semibold ${
                   tab === t
                     ? "bg-gradient-accent text-white shadow-lg shadow-primary/20"
@@ -96,9 +128,7 @@ export default function TodayPage() {
                   }
                   min={0}
                 />
-                <span className="text-2xl font-medium text-slate-400">
-                  minutes
-                </span>
+                <span className="text-2xl font-medium text-slate-400">minutes</span>
               </div>
             </div>
             <div className="w-full bg-slate-200 dark:bg-border-dark h-2 rounded-full overflow-hidden">
@@ -119,34 +149,27 @@ export default function TodayPage() {
         <section className="flex flex-col gap-6">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-bold leading-tight flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">
-                layers
-              </span>
+              <span className="material-symbols-outlined text-primary">layers</span>
               {tab === "Stabilizer" ? "Today Stack" : "Builder Queue"}
             </h3>
             <button
               onClick={() => setShowModal(true)}
               className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
             >
-              <span className="material-symbols-outlined text-sm">
-                add_circle
-              </span>
+              <span className="material-symbols-outlined text-sm">add_circle</span>
               Add Task
             </button>
           </div>
 
           {/* Builder empty state */}
-          {tab === "Builder" && builderTasks.length === 0 && (
+          {tab === "Builder" && builderActionable.length === 0 && (
             <div className="text-center py-16 px-6">
               <div className="inline-flex items-center justify-center size-16 rounded-2xl bg-slate-100 dark:bg-card-dark mb-5">
-                <span className="material-symbols-outlined text-3xl text-slate-400">
-                  pause_circle
-                </span>
+                <span className="material-symbols-outlined text-3xl text-slate-400">pause_circle</span>
               </div>
               <h3 className="text-xl font-bold mb-2">Builder is paused</h3>
               <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm mx-auto leading-relaxed">
-                This week is Stabilization week. Add business tasks when
-                you're ready — they'll live here.
+                This week is Stabilization week. Add business tasks when you're ready — they'll live here.
               </p>
               <button
                 onClick={() => setShowModal(true)}
@@ -161,13 +184,9 @@ export default function TodayPage() {
           {/* Stabilizer empty state */}
           {tab === "Stabilizer" && stabilizerTasks.length === 0 && (
             <div className="text-center py-12 text-slate-400">
-              <span className="material-symbols-outlined text-4xl mb-2 block">
-                check_circle
-              </span>
+              <span className="material-symbols-outlined text-4xl mb-2 block">check_circle</span>
               <p className="font-medium">All clear.</p>
-              <p className="text-sm mt-1">
-                No life-admin tasks need attention right now.
-              </p>
+              <p className="text-sm mt-1">No life-admin tasks need attention right now.</p>
             </div>
           )}
 
@@ -200,24 +219,18 @@ export default function TodayPage() {
                     {isActive ? (
                       <span className="text-gradient font-mono font-bold text-lg">
                         {formatTime(timer.elapsed)}
-                        {task.estimateMinutes
-                          ? ` / ${formatTime(task.estimateMinutes * 60)}`
-                          : ""}
+                        {task.estimateMinutes ? ` / ${formatTime(task.estimateMinutes * 60)}` : ""}
                       </span>
                     ) : (
                       <span className="text-slate-400 font-mono text-sm">
-                        {task.estimateMinutes
-                          ? formatMinutes(task.estimateMinutes)
-                          : "—"}
+                        {task.estimateMinutes ? formatMinutes(task.estimateMinutes) : "—"}
                       </span>
                     )}
                   </div>
 
                   <Link to={`/tasks/${task.id}`}>
                     <h4
-                      className={`${
-                        isActive ? "text-xl font-bold" : "text-lg font-semibold"
-                      } mb-1 hover:text-primary transition-colors`}
+                      className={`${isActive ? "text-xl font-bold" : "text-lg font-semibold"} mb-1 hover:text-primary transition-colors`}
                     >
                       {task.title}
                     </h4>
@@ -231,11 +244,8 @@ export default function TodayPage() {
 
                   {task.subtasks.length > 0 && (
                     <div className="mb-4 flex items-center gap-2 text-xs text-slate-400">
-                      <span className="material-symbols-outlined text-sm">
-                        checklist
-                      </span>
-                      {task.subtasks.filter((s) => s.done).length}/
-                      {task.subtasks.length} subtasks
+                      <span className="material-symbols-outlined text-sm">checklist</span>
+                      {task.subtasks.filter((s) => s.done).length}/{task.subtasks.length} subtasks
                     </div>
                   )}
 
@@ -287,6 +297,76 @@ export default function TodayPage() {
             })}
           </div>
         </section>
+
+        {/* Waiting Section */}
+        {waitingTasks.length > 0 && (
+          <section className="flex flex-col">
+            <button
+              type="button"
+              onClick={() => setWaitingOpen(!waitingOpen)}
+              className="flex items-center gap-3 py-3 text-left group"
+            >
+              <span className={`material-symbols-outlined text-slate-400 transition-transform ${waitingOpen ? "rotate-90" : ""}`}>
+                chevron_right
+              </span>
+              <h3 className="text-lg font-bold text-slate-600 dark:text-slate-300 group-hover:text-primary transition-colors">
+                Waiting
+              </h3>
+              <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold">
+                {waitingTasks.length}
+              </span>
+            </button>
+
+            {waitingOpen && (
+              <div className="flex flex-col gap-3 mt-2">
+                {waitingTasks.map((task) => {
+                  const cat = catMap.get(task.categoryId);
+                  return (
+                    <div
+                      key={task.id}
+                      className="bg-white/50 dark:bg-card-dark/30 border border-slate-200 dark:border-border-dark rounded-xl p-5 flex items-start justify-between gap-4"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                            Waiting
+                          </span>
+                          {cat && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 dark:bg-border-dark text-slate-500 dark:text-slate-400">
+                              {cat.name}
+                            </span>
+                          )}
+                        </div>
+                        <Link to={`/tasks/${task.id}`} className="hover:text-primary transition-colors">
+                          <h4 className="font-semibold truncate">{task.title}</h4>
+                        </Link>
+                        <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
+                          {task.nextActionAt && (
+                            <span className="flex items-center gap-1">
+                              <span className="material-symbols-outlined text-sm">event</span>
+                              Next action: {formatNextAction(task.nextActionAt)}
+                            </span>
+                          )}
+                        </div>
+                        {task.pendingReason && (
+                          <p className="text-xs text-slate-400 italic mt-1">
+                            {task.pendingReason}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => makeActionable(task.id)}
+                        className="flex-shrink-0 px-3 py-2 rounded-lg border border-slate-200 dark:border-border-dark text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-primary hover:text-primary transition-all"
+                      >
+                        Make actionable
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
 
         <footer className="mt-8 flex flex-col items-center gap-4 py-8 border-t border-slate-200 dark:border-border-dark">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/5 text-primary rounded-full text-sm font-medium border border-primary/10">

@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from "dexie";
 
 export type TaskDomain = "LIFE_ADMIN" | "BUSINESS";
 export type CategoryKind = "LEGAL" | "MONEY" | "MAINTENANCE" | "CAREGIVER";
+export type TaskStatus = "BACKLOG" | "TODAY" | "IN_PROGRESS" | "PENDING" | "DONE";
 
 export interface Category {
   id: string;
@@ -16,7 +17,7 @@ export interface Task {
   domain: TaskDomain;
   title: string;
   notes?: string;
-  status: "BACKLOG" | "TODAY" | "IN_PROGRESS" | "DONE";
+  status: TaskStatus;
   priority: 1 | 2 | 3 | 4;
   dueDate?: string;
   softDeadline?: string;
@@ -25,6 +26,8 @@ export interface Task {
   actualSecondsTotal: number;
   moneyImpact?: number;
   frictionNote?: string;
+  nextActionAt?: string;
+  pendingReason?: string;
   contextCard: { why: string; nextMicroStep: string; reframe: string };
   createdAt: string;
   updatedAt: string;
@@ -85,15 +88,15 @@ db.version(1).stores({
   appSettings: "id",
 });
 
-db.version(2).stores({
-  tasks: "id, categoryId, status, priority, domain",
-}).upgrade((tx) => {
-  return tx.table("tasks").toCollection().modify((task: any) => {
-    if (!task.domain) {
-      task.domain = "LIFE_ADMIN";
-    }
-  });
-});
+db.version(2)
+  .stores({ tasks: "id, categoryId, status, priority, domain" })
+  .upgrade((tx) =>
+    tx.table("tasks").toCollection().modify((task: any) => {
+      if (!task.domain) task.domain = "LIFE_ADMIN";
+    })
+  );
+
+db.version(3).stores({}).upgrade(() => {});
 
 export { db };
 
@@ -103,6 +106,35 @@ export function generateId(): string {
 
 export function nowISO(): string {
   return new Date().toISOString();
+}
+
+// --- Waiting / actionable helpers ---
+
+export function isWaiting(task: Task, now = Date.now()): boolean {
+  return (
+    task.status === "PENDING" &&
+    !!task.nextActionAt &&
+    new Date(task.nextActionAt).getTime() > now
+  );
+}
+
+export function isActionable(task: Task, now = Date.now()): boolean {
+  if (task.status === "DONE") return false;
+  if (task.status !== "PENDING") return true;
+  return !task.nextActionAt || new Date(task.nextActionAt).getTime() <= now;
+}
+
+export async function transitionDuePendingTasks(): Promise<number> {
+  const now = nowISO();
+  const pending = await db.tasks.where("status").equals("PENDING").toArray();
+  let count = 0;
+  for (const task of pending) {
+    if (task.nextActionAt && new Date(task.nextActionAt).getTime() <= Date.now()) {
+      await db.tasks.update(task.id, { status: "BACKLOG", updatedAt: now });
+      count++;
+    }
+  }
+  return count;
 }
 
 // --- Scoring ---
@@ -119,6 +151,7 @@ export function scoreTask(
   categoryKind: CategoryKind | undefined,
   availableMinutesRemaining: number
 ): number {
+  if (!isActionable(task)) return -1;
   if (task.blockedByTaskIds && task.blockedByTaskIds.length > 0) return -1;
   if (
     task.estimateMinutes &&
@@ -162,7 +195,7 @@ export function buildStabilizerStack(
 ): Task[] {
   const catMap = new Map(categories.map((c) => [c.id, c]));
   const pool = tasks.filter(
-    (t) => t.domain === "LIFE_ADMIN" && t.status !== "DONE"
+    (t) => t.domain === "LIFE_ADMIN" && isActionable(t)
   );
 
   const scored = pool
@@ -192,6 +225,16 @@ export function buildStabilizerStack(
   }
 
   return result;
+}
+
+export function getWaitingTasks(tasks: Task[], domain: TaskDomain): Task[] {
+  return tasks
+    .filter((t) => t.domain === domain && isWaiting(t))
+    .sort((a, b) => {
+      const aDate = a.nextActionAt ? new Date(a.nextActionAt).getTime() : Infinity;
+      const bDate = b.nextActionAt ? new Date(b.nextActionAt).getTime() : Infinity;
+      return aDate - bDate;
+    });
 }
 
 // --- Seed ---
@@ -267,10 +310,8 @@ export async function seedDatabase() {
       actualSecondsTotal: 0,
       contextCard: {
         why: "Restores legal travel/ID flexibility and removes a major background stressor.",
-        nextMicroStep:
-          "Confirm renewal path + required documents, then pick the earliest appointment/mail option.",
-        reframe:
-          "This is competency restoration — one admin step that unlocks future freedom.",
+        nextMicroStep: "Confirm renewal path + required documents, then pick the earliest appointment/mail option.",
+        reframe: "This is competency restoration — one admin step that unlocks future freedom.",
       },
       createdAt: now,
       updatedAt: now,
@@ -331,11 +372,13 @@ export async function seedDatabase() {
       categoryId: moneyId,
       domain: "LIFE_ADMIN",
       title: "Unemployment: submit final request (after waiting period)",
-      status: "BACKLOG",
+      status: "PENDING",
       priority: 2,
       estimateMinutes: 10,
       actualSecondsTotal: 0,
       moneyImpact: 275,
+      nextActionAt: "2026-03-02",
+      pendingReason: "Earliest request date",
       contextCard: {
         why: "Small task, real money — closes the loop and reduces financial pressure.",
         nextMicroStep: "Add the eligibility date to this task, then set a reminder for that morning.",

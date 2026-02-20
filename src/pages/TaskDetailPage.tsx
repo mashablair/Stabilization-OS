@@ -4,7 +4,7 @@ import { db, generateId, nowISO } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
 import { useState } from "react";
 
-const STATUS_OPTIONS = ["BACKLOG", "TODAY", "IN_PROGRESS", "DONE"] as const;
+const STATUS_OPTIONS = ["BACKLOG", "TODAY", "IN_PROGRESS", "PENDING", "DONE"] as const;
 const PRIORITY_LABELS: Record<number, string> = {
   1: "Critical",
   2: "High",
@@ -125,6 +125,17 @@ export default function TaskDetailPage() {
               <span className={`px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${PRIORITY_COLORS[task.priority]}`}>
                 {PRIORITY_LABELS[task.priority]} Priority
               </span>
+              {task.status === "PENDING" && (
+                <span className="px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs">hourglass_top</span>
+                  Waiting
+                  {task.nextActionAt && (
+                    <span className="font-normal ml-1">
+                      until {new Date(task.nextActionAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </span>
+                  )}
+                </span>
+              )}
               {task.dueDate && (
                 <span className="flex items-center gap-1 text-slate-500 text-sm">
                   <span className="material-symbols-outlined text-sm">calendar_today</span>
@@ -258,78 +269,130 @@ export default function TaskDetailPage() {
 
         {/* Right Sidebar */}
         <div className="lg:col-span-4 flex flex-col gap-6">
-          {/* Timer */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-8 flex flex-col items-center gap-4">
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-widest">Focus Timer</div>
-            <div className="text-5xl font-black font-mono tabular-nums tracking-tighter">
-              {isActive ? formatTime(timer.elapsed) : formatTime(task.actualSecondsTotal)}
+          {task.status === "PENDING" ? (
+            /* Waiting block — replaces timer when PENDING */
+            <div className="bg-amber-50 dark:bg-amber-950/20 rounded-2xl border-2 border-amber-300 dark:border-amber-700/50 shadow-sm p-8 flex flex-col items-center gap-5">
+              <div className="size-14 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-3xl text-amber-600 dark:text-amber-400">hourglass_top</span>
+              </div>
+              <div className="text-amber-700 dark:text-amber-300 text-xs font-bold uppercase tracking-widest">
+                Waiting
+              </div>
+
+              <div className="w-full space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1.5">
+                    Next Action Date
+                  </label>
+                  <input
+                    type="date"
+                    value={task.nextActionAt ? task.nextActionAt.slice(0, 10) : ""}
+                    onChange={(e) => update({ nextActionAt: e.target.value || undefined })}
+                    className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 h-12 text-sm font-bold focus:ring-2 focus:ring-amber-400"
+                    autoFocus={!task.nextActionAt}
+                  />
+                  {!task.nextActionAt && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">warning</span>
+                      Set a date so this task moves to the Waiting list
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1.5">
+                    Reason
+                  </label>
+                  <input
+                    className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 h-12 text-sm focus:ring-2 focus:ring-amber-400"
+                    placeholder="e.g. Waiting for response..."
+                    value={task.pendingReason ?? ""}
+                    onChange={(e) => update({ pendingReason: e.target.value || undefined })}
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={() => update({ status: "BACKLOG", nextActionAt: undefined, pendingReason: undefined })}
+                className="w-full mt-2 py-3 rounded-xl border-2 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 font-bold text-sm hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">play_arrow</span>
+                Make Actionable Now
+              </button>
             </div>
-            <div className="flex gap-3 w-full mt-2">
-              {isRunning ? (
-                <>
-                  <button
-                    onClick={() => timer.pauseTimer()}
-                    className="flex-1 bg-gradient-accent text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-primary/20"
-                  >
-                    <span className="material-symbols-outlined">pause</span>
-                    Pause
-                  </button>
-                  <button
-                    onClick={() => timer.stopTimer()}
-                    className="px-5 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    <span className="material-symbols-outlined">stop</span>
-                  </button>
-                </>
-              ) : isActive && timer.isPaused ? (
-                <>
+          ) : (
+            /* Focus Timer — shown for all non-PENDING statuses */
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-8 flex flex-col items-center gap-4">
+              <div className="text-slate-400 text-xs font-bold uppercase tracking-widest">Focus Timer</div>
+              <div className="text-5xl font-black font-mono tabular-nums tracking-tighter">
+                {isActive ? formatTime(timer.elapsed) : formatTime(task.actualSecondsTotal)}
+              </div>
+              <div className="flex gap-3 w-full mt-2">
+                {isRunning ? (
+                  <>
+                    <button
+                      onClick={() => timer.pauseTimer()}
+                      className="flex-1 bg-gradient-accent text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-primary/20"
+                    >
+                      <span className="material-symbols-outlined">pause</span>
+                      Pause
+                    </button>
+                    <button
+                      onClick={() => timer.stopTimer()}
+                      className="px-5 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <span className="material-symbols-outlined">stop</span>
+                    </button>
+                  </>
+                ) : isActive && timer.isPaused ? (
+                  <>
+                    <button
+                      onClick={() => timer.startTimer(task.id)}
+                      className="flex-1 bg-gradient-accent text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-primary/20"
+                    >
+                      <span className="material-symbols-outlined">play_arrow</span>
+                      Resume
+                    </button>
+                    <button
+                      onClick={() => timer.stopTimer()}
+                      className="px-5 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <span className="material-symbols-outlined">stop</span>
+                    </button>
+                  </>
+                ) : (
                   <button
                     onClick={() => timer.startTimer(task.id)}
                     className="flex-1 bg-gradient-accent text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-primary/20"
                   >
                     <span className="material-symbols-outlined">play_arrow</span>
-                    Resume
+                    Start Focus
                   </button>
-                  <button
-                    onClick={() => timer.stopTimer()}
-                    className="px-5 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    <span className="material-symbols-outlined">stop</span>
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => timer.startTimer(task.id)}
-                  className="flex-1 bg-gradient-accent text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-primary/20"
-                >
-                  <span className="material-symbols-outlined">play_arrow</span>
-                  Start Focus
-                </button>
+                )}
+              </div>
+
+              {completedEntries.length > 0 && (
+                <div className="w-full pt-6 border-t border-slate-100 dark:border-slate-800 mt-2">
+                  <div className="flex justify-between items-center text-xs mb-3">
+                    <span className="text-slate-500 font-medium">Session History</span>
+                    <span className="font-bold text-gradient">
+                      Total: {formatMinutes(Math.round(task.actualSecondsTotal / 60))}
+                    </span>
+                  </div>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {completedEntries.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex justify-between text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg"
+                      >
+                        <span>{new Date(entry.startAt).toLocaleString()}</span>
+                        <span className="font-mono">{formatTime(entry.seconds)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-
-            {completedEntries.length > 0 && (
-              <div className="w-full pt-6 border-t border-slate-100 dark:border-slate-800 mt-2">
-                <div className="flex justify-between items-center text-xs mb-3">
-                  <span className="text-slate-500 font-medium">Session History</span>
-                  <span className="font-bold text-gradient">
-                    Total: {formatMinutes(Math.round(task.actualSecondsTotal / 60))}
-                  </span>
-                </div>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {completedEntries.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="flex justify-between text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg"
-                    >
-                      <span>{new Date(entry.startAt).toLocaleString()}</span>
-                      <span className="font-mono">{formatTime(entry.seconds)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Fields */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-5">
