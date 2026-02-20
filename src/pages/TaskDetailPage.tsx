@@ -406,6 +406,28 @@ export default function TaskDetailPage() {
 
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                Domain
+              </label>
+              <div className="flex gap-2">
+                {(["LIFE_ADMIN", "BUSINESS"] as const).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => update({ domain: d })}
+                    className={`flex-1 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                      task.domain === d
+                        ? "bg-primary/10 text-primary border-primary"
+                        : "border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-400"
+                    }`}
+                  >
+                    {d === "LIFE_ADMIN" ? "Life Admin" : "Business"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
                 Category
               </label>
               <select

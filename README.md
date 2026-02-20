@@ -14,7 +14,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 ## Features
 
 - **Today Stack** — Choose your daily role (Stabilizer / Builder / Caregiver), set available minutes, and focus on 3-5 prioritized tasks
-- **Categories** — Organize tasks into LEGAL, MONEY, MAINTENANCE, EMOTIONAL domains with context cards (why, win condition, script)
+- **Categories** — Organize tasks into LEGAL, MONEY, MAINTENANCE, CAREGIVER domains with context cards (why, win condition, script)
 - **Task Detail** — Inline editing, subtasks, context cards (why / next micro-step / reframe), priority, due dates, money impact
 - **Focus Timer** — Start/pause/stop timer per task; persisted in IndexedDB so page refresh won't lose time
 - **Dashboard** — Weekly stats (tasks completed, time tracked, money recovered, open loops), time allocation chart, open loops trend, friction log
@@ -34,7 +34,7 @@ All data is stored locally in your browser using IndexedDB (via Dexie.js). No ba
 
 ## Seed Data
 
-On first run, the app automatically creates 4 categories (LEGAL, MONEY, MAINTENANCE, EMOTIONAL) and 7 sample tasks. To re-seed, use the **Reset All Data** option in Settings and reload the page.
+On first run, the app automatically creates 4 categories (LEGAL, MONEY, MAINTENANCE, CAREGIVER) and 7 sample tasks. To re-seed, use the **Reset All Data** option in Settings and reload the page.
 
 ## Tech Stack
 

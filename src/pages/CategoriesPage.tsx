@@ -6,7 +6,7 @@ const kindIcons: Record<string, string> = {
   LEGAL: "gavel",
   MONEY: "account_balance_wallet",
   MAINTENANCE: "home_repair_service",
-  EMOTIONAL: "spa",
+  CAREGIVER: "favorite",
 };
 
 export default function CategoriesPage() {

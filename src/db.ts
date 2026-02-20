@@ -1,15 +1,19 @@
 import Dexie, { type EntityTable } from "dexie";
 
+export type TaskDomain = "LIFE_ADMIN" | "BUSINESS";
+export type CategoryKind = "LEGAL" | "MONEY" | "MAINTENANCE" | "CAREGIVER";
+
 export interface Category {
   id: string;
   name: string;
-  kind: "LEGAL" | "MONEY" | "MAINTENANCE" | "EMOTIONAL";
+  kind: CategoryKind;
   contextCard: { why: string; winCondition: string; script: string };
 }
 
 export interface Task {
   id: string;
   categoryId: string;
+  domain: TaskDomain;
   title: string;
   notes?: string;
   status: "BACKLOG" | "TODAY" | "IN_PROGRESS" | "DONE";
@@ -81,6 +85,16 @@ db.version(1).stores({
   appSettings: "id",
 });
 
+db.version(2).stores({
+  tasks: "id, categoryId, status, priority, domain",
+}).upgrade((tx) => {
+  return tx.table("tasks").toCollection().modify((task: any) => {
+    if (!task.domain) {
+      task.domain = "LIFE_ADMIN";
+    }
+  });
+});
+
 export { db };
 
 export function generateId(): string {
@@ -90,6 +104,97 @@ export function generateId(): string {
 export function nowISO(): string {
   return new Date().toISOString();
 }
+
+// --- Scoring ---
+
+const KIND_WEIGHTS: Record<string, number> = {
+  LEGAL: 40,
+  MONEY: 30,
+  MAINTENANCE: 10,
+  CAREGIVER: 5,
+};
+
+export function scoreTask(
+  task: Task,
+  categoryKind: CategoryKind | undefined,
+  availableMinutesRemaining: number
+): number {
+  if (task.blockedByTaskIds && task.blockedByTaskIds.length > 0) return -1;
+  if (
+    task.estimateMinutes &&
+    task.estimateMinutes > availableMinutesRemaining &&
+    availableMinutesRemaining > 0
+  )
+    return -1;
+
+  let score = 0;
+
+  score += KIND_WEIGHTS[categoryKind ?? ""] ?? 0;
+
+  if (task.dueDate) {
+    const days = (new Date(task.dueDate).getTime() - Date.now()) / 86_400_000;
+    if (days <= 3) score += 35;
+    else if (days <= 7) score += 25;
+  }
+  if (task.softDeadline) {
+    const days =
+      (new Date(task.softDeadline).getTime() - Date.now()) / 86_400_000;
+    if (days <= 7) score += 15;
+  }
+
+  if (task.status === "IN_PROGRESS") score += 20;
+  const est = task.estimateMinutes ?? 30;
+  if (est <= 15) score += 12;
+  else if (est <= 30) score += 8;
+
+  if (task.moneyImpact && task.moneyImpact > 0) {
+    score += Math.min(20, task.moneyImpact / 20);
+  }
+
+  return score;
+}
+
+export function buildStabilizerStack(
+  tasks: Task[],
+  categories: Category[],
+  availableMinutes: number,
+  maxTasks = 5
+): Task[] {
+  const catMap = new Map(categories.map((c) => [c.id, c]));
+  const pool = tasks.filter(
+    (t) => t.domain === "LIFE_ADMIN" && t.status !== "DONE"
+  );
+
+  const scored = pool
+    .map((t) => ({
+      task: t,
+      score: scoreTask(t, catMap.get(t.categoryId)?.kind, availableMinutes),
+    }))
+    .filter((s) => s.score >= 0)
+    .sort((a, b) => b.score - a.score);
+
+  const result: Task[] = [];
+  const kindCount: Record<string, number> = {};
+  let usedMinutes = 0;
+
+  for (const { task } of scored) {
+    if (result.length >= maxTasks) break;
+
+    const est = task.estimateMinutes ?? 15;
+    if (usedMinutes + est > availableMinutes && usedMinutes > 0) continue;
+
+    const kind = catMap.get(task.categoryId)?.kind ?? "";
+    if ((kindCount[kind] ?? 0) >= 2 && scored.length > maxTasks) continue;
+
+    result.push(task);
+    usedMinutes += est;
+    kindCount[kind] = (kindCount[kind] ?? 0) + 1;
+  }
+
+  return result;
+}
+
+// --- Seed ---
 
 export async function seedDatabase() {
   const catCount = await db.categories.count();
@@ -132,12 +237,12 @@ export async function seedDatabase() {
     },
     {
       id: generateId(),
-      name: "EMOTIONAL",
-      kind: "EMOTIONAL",
+      name: "CAREGIVER",
+      kind: "CAREGIVER",
       contextCard: {
-        why: "The internal engine. Stress management and mental clarity are the ultimate performance tools.",
+        why: "People and relationships. Caregiving, family, and connection are the foundation of stability.",
         winCondition:
-          "Regulated nervous system, clarity of thought, and meaningful connections maintained.",
+          "Key relationships nurtured, dependents cared for, and your capacity to show up is sustained.",
         script: "Breathe through the tasks. You are resilient.",
       },
     },
@@ -148,285 +253,233 @@ export async function seedDatabase() {
   const legalId = categories[0].id;
   const moneyId = categories[1].id;
   const maintenanceId = categories[2].id;
-  const emotionalId = categories[3].id;
+  const caregiverId = categories[3].id;
 
   const tasks: Task[] = [
     {
       id: generateId(),
       categoryId: legalId,
-      title: "Passport renewal",
-      status: "TODAY",
-      priority: 1,
-      estimateMinutes: 45,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Valid ID is essential for travel and legal identity.",
-        nextMicroStep: "Find the passport renewal form online.",
-        reframe:
-          "This is one form that protects months of future flexibility.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [
-        { id: generateId(), title: "Gather required documents", done: false },
-        { id: generateId(), title: "Take passport photo", done: false },
-        { id: generateId(), title: "Fill out application form", done: false },
-        { id: generateId(), title: "Submit at post office", done: false },
-      ],
-    },
-    {
-      id: generateId(),
-      categoryId: legalId,
-      title: "Taxes prep",
-      status: "TODAY",
-      priority: 1,
-      dueDate: new Date(Date.now() + 7 * 86400000).toISOString(),
-      estimateMinutes: 120,
-      actualSecondsTotal: 0,
-      moneyImpact: 2000,
-      contextCard: {
-        why: "Filing on time avoids penalties and secures refunds.",
-        nextMicroStep: "Open tax software and verify last year's return.",
-        reframe:
-          "Protecting my future self's peace and stability.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [
-        { id: generateId(), title: "Collect W-2s and 1099s", done: false },
-        {
-          id: generateId(),
-          title: "Organize deduction receipts",
-          done: false,
-        },
-        { id: generateId(), title: "Review tax software", done: false },
-      ],
-    },
-    {
-      id: generateId(),
-      categoryId: legalId,
-      title: "Homeschool application deadline check",
+      domain: "LIFE_ADMIN",
+      title: "Renew U.S. passport (expired)",
       status: "BACKLOG",
-      priority: 2,
+      priority: 1,
+      estimateMinutes: 30,
+      actualSecondsTotal: 0,
+      contextCard: {
+        why: "Restores legal travel/ID flexibility and removes a major background stressor.",
+        nextMicroStep:
+          "Confirm renewal path + required documents, then pick the earliest appointment/mail option.",
+        reframe:
+          "This is competency restoration — one admin step that unlocks future freedom.",
+      },
+      createdAt: now,
+      updatedAt: now,
+      subtasks: [
+        { id: generateId(), title: "Confirm renewal method (mail vs appointment)", done: false },
+        { id: generateId(), title: "Gather required documents", done: false },
+        { id: generateId(), title: "Take/obtain passport photo", done: false },
+        { id: generateId(), title: "Complete DS-82 / required form", done: false },
+        { id: generateId(), title: "Pay fee + submit", done: false },
+      ],
+    },
+    {
+      id: generateId(),
+      categoryId: legalId,
+      domain: "LIFE_ADMIN",
+      title: "Homeschool application: check deadline + submit if due",
+      status: "BACKLOG",
+      priority: 1,
       estimateMinutes: 20,
       actualSecondsTotal: 0,
       contextCard: {
-        why: "Missing deadlines jeopardizes the kids' education plan.",
-        nextMicroStep: "Search the county website for current deadlines.",
-        reframe:
-          "Knowing the date is the first step to meeting it.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [],
-    },
-    {
-      id: generateId(),
-      categoryId: moneyId,
-      title: "Homeschool reimbursements",
-      status: "TODAY",
-      priority: 2,
-      estimateMinutes: 30,
-      actualSecondsTotal: 0,
-      moneyImpact: 450,
-      contextCard: {
-        why: "Recovering money already spent on education materials.",
-        nextMicroStep:
-          "Gather receipts from the last month into one folder.",
-        reframe: "This is money you've already earned back.",
+        why: "Protects Sophie's schooling compliance and prevents last-minute panic.",
+        nextMicroStep: "Open the official site and write down the exact deadline date.",
+        reframe: "Clarity first. Once I know the date, this becomes a simple checklist.",
       },
       createdAt: now,
       updatedAt: now,
       subtasks: [
-        {
-          id: generateId(),
-          title: "Collect receipts from email",
-          done: false,
-        },
-        { id: generateId(), title: "Submit reimbursement form", done: false },
+        { id: generateId(), title: "Find the official deadline date", done: false },
+        { id: generateId(), title: "If due: complete and submit application", done: false },
+        { id: generateId(), title: "Save confirmation / receipt", done: false },
+      ],
+    },
+    {
+      id: generateId(),
+      categoryId: legalId,
+      domain: "LIFE_ADMIN",
+      title: "Taxes prep: gather docs + decide filing status",
+      status: "BACKLOG",
+      priority: 1,
+      estimateMinutes: 60,
+      actualSecondsTotal: 0,
+      contextCard: {
+        why: "Early prep reduces stress and avoids the seasonal rush with your tax preparer.",
+        nextMicroStep: "Make a short list of missing items needed from your husband and request them.",
+        reframe: "This is runway protection: clean taxes = fewer surprises later.",
+      },
+      createdAt: now,
+      updatedAt: now,
+      subtasks: [
+        { id: generateId(), title: "Confirm: file jointly vs separately (note questions for tax pro)", done: false },
+        { id: generateId(), title: "Request missing tax papers from husband", done: false },
+        { id: generateId(), title: "Upload/organize all docs for tax preparer", done: false },
       ],
     },
     {
       id: generateId(),
       categoryId: moneyId,
-      title: "Categorize January credit card transactions",
+      domain: "LIFE_ADMIN",
+      title: "Unemployment: submit final request (after waiting period)",
       status: "BACKLOG",
-      priority: 3,
-      estimateMinutes: 40,
+      priority: 2,
+      estimateMinutes: 10,
       actualSecondsTotal: 0,
+      moneyImpact: 275,
       contextCard: {
-        why: "Understanding spending patterns prevents financial surprises.",
-        nextMicroStep: "Export this month's statement as CSV.",
-        reframe: "Clarity is power. Each categorized row is progress.",
+        why: "Small task, real money — closes the loop and reduces financial pressure.",
+        nextMicroStep: "Add the eligibility date to this task, then set a reminder for that morning.",
+        reframe: "This is not paperwork — it's cash recovery.",
       },
       createdAt: now,
       updatedAt: now,
-      subtasks: [],
+      subtasks: [
+        { id: generateId(), title: "Confirm date you can submit", done: false },
+        { id: generateId(), title: "Submit claim request", done: false },
+        { id: generateId(), title: "Save confirmation screenshot", done: false },
+      ],
     },
     {
       id: generateId(),
       categoryId: moneyId,
-      title: "SunPass charges audit",
+      domain: "LIFE_ADMIN",
+      title: "Categorize January credit card transactions + mark business",
       status: "BACKLOG",
-      priority: 3,
-      estimateMinutes: 25,
+      priority: 2,
+      estimateMinutes: 60,
       actualSecondsTotal: 0,
-      moneyImpact: 50,
       contextCard: {
-        why: "Incorrect charges add up. Auditing saves real money.",
-        nextMicroStep: "Log into SunPass and download recent statements.",
-        reframe: "Every dollar recovered is a dollar earned.",
+        why: "Creates clean financial clarity for taxes and business tracking.",
+        nextMicroStep: "Export January statement (CSV/PDF) and do the first 10 transactions.",
+        reframe: "Momentum beats perfection. Ten rows is a win.",
       },
       createdAt: now,
       updatedAt: now,
-      subtasks: [],
+      subtasks: [
+        { id: generateId(), title: "Export January statement", done: false },
+        { id: generateId(), title: "Mark business transactions", done: false },
+        { id: generateId(), title: "Finish categorization", done: false },
+      ],
+    },
+    {
+      id: generateId(),
+      categoryId: moneyId,
+      domain: "LIFE_ADMIN",
+      title: "Select homeschool charges from statements (prep for PEP reimbursement)",
+      status: "BACKLOG",
+      priority: 2,
+      estimateMinutes: 45,
+      actualSecondsTotal: 0,
+      contextCard: {
+        why: "Turns past spending into recoverable funds and reduces money anxiety.",
+        nextMicroStep: "Filter statements for homeschool vendors and copy items into a draft list.",
+        reframe: "This is a treasure hunt for money already spent.",
+      },
+      createdAt: now,
+      updatedAt: now,
+      subtasks: [
+        { id: generateId(), title: "Identify homeschool purchases in statements", done: false },
+        { id: generateId(), title: "Create reimbursement list (vendor, date, amount)", done: false },
+      ],
+    },
+    {
+      id: generateId(),
+      categoryId: moneyId,
+      domain: "LIFE_ADMIN",
+      title: "Submit homeschool reimbursements (15 items) + request missing proof",
+      status: "BACKLOG",
+      priority: 2,
+      estimateMinutes: 90,
+      actualSecondsTotal: 0,
+      contextCard: {
+        why: "Direct cash recovery — reduces panic and extends runway.",
+        nextMicroStep: "Submit the easiest 3 reimbursements first to build momentum.",
+        reframe: "This isn't a 'big scary task' — it's 15 small wins.",
+      },
+      createdAt: now,
+      updatedAt: now,
+      subtasks: [
+        { id: generateId(), title: "Create list of 15 reimbursements", done: false },
+        { id: generateId(), title: "Submit 3 easiest first", done: false },
+        { id: generateId(), title: "Request missing proof/docs", done: false },
+        { id: generateId(), title: "Submit remaining items", done: false },
+        { id: generateId(), title: "Save confirmations", done: false },
+      ],
+    },
+    {
+      id: generateId(),
+      categoryId: moneyId,
+      domain: "LIFE_ADMIN",
+      title: "SunPass: investigate charges tied to old pass",
+      status: "BACKLOG",
+      priority: 3,
+      estimateMinutes: 20,
+      actualSecondsTotal: 0,
+      contextCard: {
+        why: "Stops recurring leaks and prevents surprise fees.",
+        nextMicroStep: "Log in and locate the account/pass that's generating charges.",
+        reframe: "Fixing leaks is earning money.",
+      },
+      createdAt: now,
+      updatedAt: now,
+      subtasks: [
+        { id: generateId(), title: "Log into SunPass", done: false },
+        { id: generateId(), title: "Identify old pass + associated vehicle/plate", done: false },
+        { id: generateId(), title: "Resolve/close/transfer and confirm charges stop", done: false },
+      ],
+    },
+    {
+      id: generateId(),
+      categoryId: caregiverId,
+      domain: "LIFE_ADMIN",
+      title: "Divorce paperwork: decide urgency + outline next steps",
+      status: "BACKLOG",
+      priority: 3,
+      estimateMinutes: 30,
+      actualSecondsTotal: 0,
+      contextCard: {
+        why: "Closes a long-running open loop and protects future legal/financial clarity.",
+        nextMicroStep: "Write down 3 questions (timing, filing, implications) to ask a professional.",
+        reframe: "This is clarity work — not drama.",
+      },
+      createdAt: now,
+      updatedAt: now,
+      subtasks: [
+        { id: generateId(), title: "List questions for lawyer/mediator (timing, costs, implications)", done: false },
+        { id: generateId(), title: "Collect key documents (marriage date, assets list basics)", done: false },
+        { id: generateId(), title: "Decide: file now vs later", done: false },
+      ],
     },
     {
       id: generateId(),
       categoryId: maintenanceId,
-      title: "Ask brother to take over OpenAI membership",
+      domain: "LIFE_ADMIN",
+      title: "Ask brother to take over OpenAI membership for sister",
       status: "BACKLOG",
       priority: 4,
-      estimateMinutes: 10,
-      actualSecondsTotal: 0,
-      moneyImpact: -20,
-      contextCard: {
-        why: "Reducing unnecessary recurring costs clears financial noise.",
-        nextMicroStep: "Send a text message to brother about the transfer.",
-        reframe:
-          "A 2-minute conversation saves $20/month forever.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [],
-    },
-    {
-      id: generateId(),
-      categoryId: maintenanceId,
-      title: "Deep clean kitchen and meal prep area",
-      status: "BACKLOG",
-      priority: 2,
-      estimateMinutes: 45,
+      estimateMinutes: 5,
       actualSecondsTotal: 0,
       contextCard: {
-        why: "A clean environment reduces daily friction and decision fatigue.",
-        nextMicroStep: "Clear the counter and wipe it down.",
-        reframe: "A calm space is a gift to tomorrow's version of you.",
+        why: "Clears recurring admin and prevents avoidable subscription confusion.",
+        nextMicroStep: "Send a single text with exactly what you need him to do.",
+        reframe: "One message removes a repeating headache.",
       },
       createdAt: now,
       updatedAt: now,
       subtasks: [
-        { id: generateId(), title: "Clear countertops", done: false },
-        { id: generateId(), title: "Clean out fridge", done: false },
-        { id: generateId(), title: "Organize pantry shelf", done: false },
+        { id: generateId(), title: "Send brother the request + instructions", done: false },
+        { id: generateId(), title: "Confirm it's transferred", done: false },
       ],
-    },
-    {
-      id: generateId(),
-      categoryId: maintenanceId,
-      title: "Schedule car maintenance appointment",
-      status: "BACKLOG",
-      priority: 2,
-      estimateMinutes: 15,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Reliable transportation keeps the whole system running.",
-        nextMicroStep: "Open the dealership website and check available times.",
-        reframe: "Preventive care is always cheaper than emergency repair.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [],
-    },
-    {
-      id: generateId(),
-      categoryId: maintenanceId,
-      title: "Fix leaking bathroom faucet",
-      status: "BACKLOG",
-      priority: 3,
-      estimateMinutes: 30,
-      actualSecondsTotal: 0,
-      moneyImpact: 15,
-      contextCard: {
-        why: "Small repairs prevent bigger (and more expensive) problems.",
-        nextMicroStep: "Watch a 2-minute YouTube tutorial on your faucet type.",
-        reframe: "You're capable of solving this. One bolt at a time.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [],
-    },
-    {
-      id: generateId(),
-      categoryId: emotionalId,
-      title: "10-minute morning journaling",
-      status: "BACKLOG",
-      priority: 1,
-      estimateMinutes: 10,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Processing thoughts on paper prevents them from looping in your mind.",
-        nextMicroStep: "Open your notebook and write one sentence about how you feel.",
-        reframe: "You don't need to have the answers. Just write what's true.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [],
-    },
-    {
-      id: generateId(),
-      categoryId: emotionalId,
-      title: "Call a friend or family member",
-      status: "BACKLOG",
-      priority: 2,
-      estimateMinutes: 20,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Connection is medicine. Isolation amplifies stress.",
-        nextMicroStep: "Pick one person and send a 'thinking of you' text.",
-        reframe: "Reaching out is strength, not weakness.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [],
-    },
-    {
-      id: generateId(),
-      categoryId: emotionalId,
-      title: "Evening wind-down routine",
-      status: "BACKLOG",
-      priority: 2,
-      estimateMinutes: 25,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Quality sleep is the single biggest lever for emotional regulation.",
-        nextMicroStep: "Set a phone alarm for 30 minutes before bedtime.",
-        reframe: "Rest is not laziness. It's how you recharge your capacity.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [
-        { id: generateId(), title: "Screens off", done: false },
-        { id: generateId(), title: "5-minute stretching", done: false },
-        { id: generateId(), title: "Write 3 things that went well today", done: false },
-      ],
-    },
-    {
-      id: generateId(),
-      categoryId: emotionalId,
-      title: "Walk outside for 15 minutes",
-      status: "BACKLOG",
-      priority: 1,
-      estimateMinutes: 15,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Movement and sunlight directly lower cortisol and improve mood.",
-        nextMicroStep: "Put on shoes and step outside. That's it.",
-        reframe: "You don't need a plan. Just move your body.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [],
     },
   ];
 
