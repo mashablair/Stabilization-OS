@@ -81,22 +81,12 @@ const db = new Dexie("StabilizationOS") as Dexie & {
 
 db.version(1).stores({
   categories: "id, kind",
-  tasks: "id, categoryId, status, priority",
+  tasks: "id, categoryId, status, priority, domain",
   timeEntries: "id, taskId",
   weeklyReviews: "id, weekStart",
   timerState: "id",
   appSettings: "id",
 });
-
-db.version(2)
-  .stores({ tasks: "id, categoryId, status, priority, domain" })
-  .upgrade((tx) =>
-    tx.table("tasks").toCollection().modify((task: any) => {
-      if (!task.domain) task.domain = "LIFE_ADMIN";
-    })
-  );
-
-db.version(3).stores({}).upgrade(() => {});
 
 export { db };
 
