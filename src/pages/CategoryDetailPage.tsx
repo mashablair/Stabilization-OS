@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, nowISO } from "../db";
+import { db, nowISO, type TaskStatus } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
 
 export default function CategoryDetailPage() {
@@ -24,7 +24,13 @@ export default function CategoryDetailPage() {
   const doneTasks = tasks.filter((t) => t.status === "DONE");
   const completionPct = tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0;
 
-  const statusOrder = { IN_PROGRESS: 0, TODAY: 1, BACKLOG: 2, DONE: 3 };
+  const statusOrder: Record<TaskStatus, number> = {
+    IN_PROGRESS: 0,
+    TODAY: 1,
+    BACKLOG: 2,
+    PENDING: 3,
+    DONE: 4,
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10 pb-24 md:pb-10">

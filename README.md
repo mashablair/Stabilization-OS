@@ -23,7 +23,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Data Storage
 
-All data is stored locally in your browser using IndexedDB (via Dexie.js). No backend required. Data persists across page refreshes.
+All data is stored locally in your browser using IndexedDB (via Dexie.js) for this domain. No backend required. Data persists across page refreshes. Use **Export Share Bundle** in Settings for backups.
 
 ## Export / Import
 
@@ -44,9 +44,24 @@ On first run, the app automatically creates 4 categories (LEGAL, MONEY, MAINTENA
 - Recharts (charts)
 - React Router v7
 
+## Environment Variables
+
+No env vars required. The app runs fully client-side with no API keys or secrets. If you add features that need configuration, use `VITE_`-prefixed variables (e.g. `VITE_API_URL`); Vite only exposes env vars starting with `VITE_` to the client.
+
 ## Building for Production
 
 ```bash
 npm run build
 npm run preview
 ```
+
+## Deploy to Cloudflare Pages
+
+1. Connect your repo to [Cloudflare Pages](https://pages.cloudflare.com).
+2. Configure the project:
+   - **Build command:** `npm run build`
+   - **Output directory:** `dist`
+   - **Root directory:** (leave empty if project root)
+3. **Node version:** Use Node.js 18 or later (set via Environment Variables in Cloudflare dashboard: `NODE_VERSION` = `18`).
+4. **SPA routing:** The `public/_redirects` file is included in the build and configures Cloudflare Pages to serve `index.html` for all routes (status 200), so deep links and page refreshes work correctly.
+5. **Custom domain:** In your Cloudflare Pages project, go to **Custom domains** → **Set up a custom domain** and follow the steps to add your domain.
