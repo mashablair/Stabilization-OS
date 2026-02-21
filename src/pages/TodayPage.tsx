@@ -380,6 +380,7 @@ export default function TodayPage() {
         open={showModal}
         onClose={() => setShowModal(false)}
         defaultDomain={tab === "Builder" ? "BUSINESS" : "LIFE_ADMIN"}
+        addToTodayStack={tab === "Stabilizer"}
       />
     </div>
   );

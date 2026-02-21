@@ -148,6 +148,14 @@ describe("stabilizer scoring respects urgency and category weights", () => {
     expect(scoreTask(inProg, "LEGAL", 120)).toBeGreaterThan(scoreTask(backlog, "LEGAL", 120));
   });
 
+  it("TODAY status gets priority bonus so explicitly-pinned tasks show in Today Stack", () => {
+    const today = makeTask({ status: "TODAY", categoryId: "cat-care", title: "Birthday party" });
+    const backlog = makeTask({ status: "BACKLOG", categoryId: "cat-legal", title: "Legal thing" });
+    expect(scoreTask(today, "CAREGIVER", 120)).toBeGreaterThan(scoreTask(backlog, "LEGAL", 120));
+    const stack = buildStabilizerStack([backlog, today], categories, 120);
+    expect(stack.map((t) => t.title)).toContain("Birthday party");
+  });
+
   it("small tasks (<=15 min) get higher momentum bonus than 30 min", () => {
     const small = makeTask({ estimateMinutes: 10 });
     const medium = makeTask({ estimateMinutes: 30 });

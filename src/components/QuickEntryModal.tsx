@@ -6,9 +6,11 @@ interface Props {
   open: boolean;
   onClose: () => void;
   defaultDomain?: TaskDomain;
+  /** When true, new LIFE_ADMIN tasks get status TODAY so they show in the Today Stack */
+  addToTodayStack?: boolean;
 }
 
-export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_ADMIN" }: Props) {
+export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_ADMIN", addToTodayStack = false }: Props) {
   const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -32,7 +34,7 @@ export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_A
       categoryId: catId,
       domain,
       title: title.trim(),
-      status: "BACKLOG",
+      status: addToTodayStack && domain === "LIFE_ADMIN" ? "TODAY" : "BACKLOG",
       priority: 2,
       estimateMinutes: estimate,
       actualSecondsTotal: 0,

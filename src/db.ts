@@ -166,6 +166,8 @@ export function scoreTask(
   }
 
   if (task.status === "IN_PROGRESS") score += 20;
+  // Explicitly pinned-for-today tasks always get priority (so they show in Today view)
+  if (task.status === "TODAY") score += 50;
   const est = task.estimateMinutes ?? 30;
   if (est <= 15) score += 12;
   else if (est <= 30) score += 8;
