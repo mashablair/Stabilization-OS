@@ -31,8 +31,8 @@ export default function Layout() {
 
   return (
     <div className={isDark ? "dark" : ""}>
-      <div className="bg-[#f6f7f8] dark:bg-[#0f1419] text-slate-900 dark:text-slate-100 min-h-screen">
-        <header className="flex items-center justify-between border-b border-slate-200 dark:border-[#2a343f] px-6 md:px-10 py-3 bg-white/80 dark:bg-[#0f1419]/80 backdrop-blur-md sticky top-0 z-50">
+      <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
+        <header className="flex items-center justify-between border-b border-slate-200 dark:border-border-dark px-6 md:px-10 py-3 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md sticky top-0 z-50">
           <NavLink to="/" className="flex items-center gap-3">
             <div className="size-7">{logoSvg}</div>
             <h1 className="text-lg font-bold tracking-tight">
@@ -68,7 +68,7 @@ export default function Layout() {
                 darkMode: !isDark,
               });
             }}
-            className="flex size-10 cursor-pointer items-center justify-center rounded-lg bg-slate-100 dark:bg-[#181f26] text-slate-600 dark:text-slate-300 hover:bg-primary/10 transition-colors"
+            className="flex size-10 cursor-pointer items-center justify-center rounded-lg bg-slate-100 dark:bg-card-dark text-slate-600 dark:text-slate-300 hover:bg-primary/10 transition-colors"
             title="Toggle dark mode"
           >
             <span className="material-symbols-outlined">
@@ -82,7 +82,7 @@ export default function Layout() {
         </main>
 
         {/* Mobile bottom nav */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-[#0f1419]/90 backdrop-blur-md border-t border-slate-200 dark:border-[#2a343f] flex justify-around py-2 z-50">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-slate-200 dark:border-border-dark flex justify-around py-2 z-50">
           {navItems.map((item) => (
             <NavLink
               key={item.to}

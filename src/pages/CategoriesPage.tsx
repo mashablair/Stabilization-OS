@@ -60,7 +60,7 @@ export default function CategoriesPage() {
                 {cat.name}
               </h3>
 
-              <div className="space-y-6 flex-grow">
+              <div className="space-y-6 grow">
                 <div>
                   <span className="text-[10px] uppercase font-bold tracking-[0.15em] text-slate-400 dark:text-slate-500 block mb-1">
                     Why this matters

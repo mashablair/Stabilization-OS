@@ -105,7 +105,7 @@ export default function TaskDetailPage() {
                 onClick={() =>
                   update({ status: task.status === "DONE" ? "TODAY" : "DONE" })
                 }
-                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${
                   task.status === "DONE"
                     ? "bg-gradient-accent border-transparent"
                     : "border-slate-300 dark:border-slate-600 hover:border-primary"
@@ -216,7 +216,7 @@ export default function TaskDetailPage() {
                 >
                   <button
                     onClick={() => toggleSubtask(sub.id)}
-                    className={`size-5 rounded flex items-center justify-center flex-shrink-0 ${
+                    className={`size-5 rounded flex items-center justify-center shrink-0 ${
                       sub.done
                         ? "bg-gradient-accent"
                         : "border-2 border-slate-300 dark:border-slate-600 hover:border-primary"

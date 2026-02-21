@@ -79,7 +79,7 @@ export default function CategoryDetailPage() {
                       await db.tasks.update(task.id, { status: "DONE", updatedAt: nowISO() });
                     }
                   }}
-                  className={`size-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                  className={`size-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                     task.status === "DONE"
                       ? "bg-gradient-accent border-transparent"
                       : "border-slate-300 dark:border-slate-600 hover:border-primary"

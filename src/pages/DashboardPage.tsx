@@ -310,7 +310,7 @@ export default function DashboardPage() {
       </div>
 
       <footer className="mt-12 p-8 vibrant-gradient-soft rounded-xl border border-primary/10 flex flex-col md:flex-row items-center gap-6">
-        <div className="w-12 h-12 rounded-full bg-gradient-accent flex items-center justify-center flex-shrink-0 text-white shadow-lg shadow-primary/20">
+        <div className="w-12 h-12 rounded-full bg-gradient-accent flex items-center justify-center shrink-0 text-white shadow-lg shadow-primary/20">
           <span className="material-symbols-outlined text-2xl">
             auto_awesome
           </span>
