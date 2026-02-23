@@ -62,9 +62,27 @@ export default function TodayPage() {
     : (settings?.builderAvailableMinutes ?? 120);
   const isOverridden = !!currentOverride && currentOverride.date === today;
 
+  const timeEntries = useLiveQuery(() => db.timeEntries.toArray()) ?? [];
+  const taskById = useMemo(() => new Map(allTasks.map((t) => [t.id, t])), [allTasks]);
+  const spentSecondsByDomain = useMemo(() => {
+    const todayStr = today;
+    const byDomain: Record<TaskDomain, number> = { LIFE_ADMIN: 0, BUSINESS: 0 };
+    for (const e of timeEntries) {
+      const task = taskById.get(e.taskId);
+      if (!task?.domain) continue;
+      if (!e.startAt.startsWith(todayStr)) continue;
+      const seconds = e.endAt ? e.seconds : timer.activeTaskId === e.taskId ? timer.elapsed : 0;
+      byDomain[task.domain] += seconds;
+    }
+    return byDomain;
+  }, [timeEntries, today, timer.activeTaskId, timer.elapsed, taskById]);
+  const stabilizerSpentMins = Math.round(spentSecondsByDomain.LIFE_ADMIN / 60);
+  const builderSpentMins = Math.round(spentSecondsByDomain.BUSINESS / 60);
+
+  const stabilizerRemainingCapacity = Math.max(0, stabilizerMins - stabilizerSpentMins);
   const { pinned: stabilizerPinned, suggested: stabilizerSuggested } = useMemo(
-    () => buildStabilizerStackSplit(allTasks, categories, stabilizerMins, 5),
-    [allTasks, categories, stabilizerMins]
+    () => buildStabilizerStackSplit(allTasks, categories, stabilizerRemainingCapacity, 5),
+    [allTasks, categories, stabilizerRemainingCapacity]
   );
   const stabilizerTasks = [...stabilizerPinned, ...stabilizerSuggested];
 
@@ -86,6 +104,8 @@ export default function TodayPage() {
     d.setHours(0, 0, 0, 0);
     return d.getTime();
   }, []);
+
+  const spentMins = tab === "Stabilizer" ? stabilizerSpentMins : builderSpentMins;
 
   const doneToday = useMemo(() => {
     const domain = tab === "Stabilizer" ? "LIFE_ADMIN" : "BUSINESS";
@@ -109,7 +129,20 @@ export default function TodayPage() {
     (s, t) => s + (t.estimateMinutes ?? 0),
     0
   );
-  const pct = Math.min((allocatedMins / Math.max(availMins, 1)) * 100, 100);
+  const usedMins = spentMins + allocatedMins;
+  const breathingMins = availMins - usedMins;
+  const isOverCapacity = breathingMins < 0;
+  const overMins = isOverCapacity ? Math.abs(breathingMins) : 0;
+  const cap = Math.max(availMins, 1);
+  const spentPct = (spentMins / cap) * 100;
+  const allocatedPct = (allocatedMins / cap) * 100;
+  const breathingPct = Math.max(0, (breathingMins / cap) * 100);
+  const spentBarPct = isOverCapacity
+    ? (spentMins / Math.max(usedMins, 1)) * 100
+    : spentPct;
+  const allocatedBarPct = isOverCapacity
+    ? (allocatedMins / Math.max(usedMins, 1)) * 100
+    : allocatedPct;
 
   const closeCpPopoverOnTabSwitch = () => setCapacityPopoverOpen(false);
   const catMap = new Map(categories.map((c) => [c.id, c]));
@@ -312,10 +345,10 @@ export default function TodayPage() {
 
         {/* Capacity */}
         {(tab === "Stabilizer" || (tab === "Builder" && builderActionable.length > 0)) && (
-          <section className="flex flex-col items-center gap-4 bg-primary/5 p-6 rounded-2xl border border-primary/10">
+          <section className="flex flex-col items-center gap-4 bg-primary/5 p-6 rounded-2xl border border-primary/10 mb-[25px]">
             <div className="flex flex-col items-center gap-2">
               <h3 className="text-slate-700 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">
-                Available Capacity
+                Time Capacity
               </h3>
               <div className="relative flex items-center gap-3">
                 <span className="text-5xl font-bold text-gradient">{availMins}</span>
@@ -344,16 +377,49 @@ export default function TodayPage() {
                 </span>
               )}
             </div>
-            <div className="w-full bg-slate-200 dark:bg-border-dark h-2 rounded-full overflow-hidden">
-              <div
-                className="bg-gradient-accent h-full rounded-full transition-all"
-                style={{ width: `${pct}%` }}
-              />
+            <div className="w-full bg-slate-200 dark:bg-border-dark h-2 rounded-full overflow-hidden flex">
+              {spentMins > 0 && (
+                <div
+                  className="h-full shrink-0 transition-all bg-green-500 dark:bg-green-600 first:rounded-l-full last:rounded-r-full"
+                  style={{ width: `${isOverCapacity ? spentBarPct : spentPct}%` }}
+                  title={`${spentMins} min spent`}
+                />
+              )}
+              {allocatedMins > 0 && (
+                <div
+                  className="h-full shrink-0 bg-gradient-accent transition-all first:rounded-l-full last:rounded-r-full"
+                  style={{ width: `${isOverCapacity ? allocatedBarPct : allocatedPct}%` }}
+                  title={`${allocatedMins} min allocated`}
+                />
+              )}
+              {!isOverCapacity && breathingMins > 0 && (
+                <div
+                  className="h-full shrink-0 bg-slate-200 dark:bg-border-dark last:rounded-r-full"
+                  style={{ width: `${breathingPct}%` }}
+                />
+              )}
             </div>
-            <p className="text-xs text-slate-500 italic">
-              {allocatedMins} minutes allocated to your stack
-              {availMins - allocatedMins > 0 &&
-                ` — ${availMins - allocatedMins} minutes of breathing room`}
+            <p className="text-xs text-slate-500 dark:text-slate-400 italic text-center">
+              {spentMins > 0 && (
+                <>
+                  <span className="text-green-600 dark:text-green-400">{spentMins} min spent</span>
+                  {allocatedMins > 0 && " • "}
+                </>
+              )}
+              {allocatedMins > 0 && (
+                <>
+                  <span>{allocatedMins} min allocated to stack</span>
+                  {!isOverCapacity && breathingMins > 0 && (
+                    <> • <span className="text-slate-400">{breathingMins} min breathing room</span></>
+                  )}
+                  {isOverCapacity && (
+                    <> • <span className="text-amber-600 dark:text-amber-400 font-semibold">{overMins} min over capacity</span></>
+                  )}
+                </>
+              )}
+              {spentMins === 0 && allocatedMins === 0 && (
+                <span>No time tracked yet today</span>
+              )}
             </p>
           </section>
         )}
@@ -366,7 +432,7 @@ export default function TodayPage() {
                 <span className="material-symbols-outlined text-primary">layers</span>
                 {tab === "Stabilizer" ? "Today Stack" : "Builder Queue"}
                 {tab === "Stabilizer" && (
-                  <span className="text-slate-400 font-normal text-base">
+                  <span className="hidden md:inline text-slate-400 font-normal text-base">
                     ({stackCount}/5)
                   </span>
                 )}
@@ -375,22 +441,24 @@ export default function TodayPage() {
                 <button
                   onClick={() => setShowAllTasksDrawer(true)}
                   className="text-slate-600 dark:text-slate-400 text-sm font-semibold flex items-center gap-1 hover:text-primary transition-colors"
+                  title="View all tasks"
                 >
                   <span className="material-symbols-outlined text-sm">list</span>
-                  View all tasks
+                  <span className="hidden md:inline">All tasks</span>
                 </button>
                 <button
                   onClick={() => setShowModal(true)}
                   className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
+                  title="Add Task"
                 >
                   <span className="material-symbols-outlined text-sm">add_circle</span>
-                  Add Task
+                  <span className="hidden md:inline">Add Task</span>
                 </button>
               </div>
             </div>
             {tab === "Stabilizer" && (
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Up to 5 tasks. Pin tasks from All tasks to customize your stack.
+                Up to 5 tasks. Pin tasks from All Tasks to customize your stack.
               </p>
             )}
           </div>

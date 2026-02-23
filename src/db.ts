@@ -289,11 +289,12 @@ export function scoreTask(
   return score;
 }
 
-/** Pinned = user chose TODAY; Suggested = algorithm fills remaining slots */
+/** Pinned = user chose TODAY; Suggested = algorithm fills remaining slots.
+ * remainingCapacity = capacity - timeSpentToday (caller passes this). */
 export function buildStabilizerStackSplit(
   tasks: Task[],
   categories: Category[],
-  availableMinutes: number,
+  remainingCapacity: number,
   maxTasks = 5
 ): { pinned: Task[]; suggested: Task[] } {
   const catMap = new Map(categories.map((c) => [c.id, c]));
@@ -304,12 +305,13 @@ export function buildStabilizerStackSplit(
   const pinned = pool.filter((t) => t.status === "TODAY").slice(0, maxTasks);
   const pinnedIds = new Set(pinned.map((t) => t.id));
   const pinnedMins = pinned.reduce((s, t) => s + (t.estimateMinutes ?? 15), 0);
+  const minsLeft = Math.max(0, remainingCapacity - pinnedMins);
 
   const scored = pool
     .filter((t) => !pinnedIds.has(t.id))
     .map((t) => ({
       task: t,
-      score: scoreTask(t, catMap.get(t.categoryId)?.kind, availableMinutes),
+      score: scoreTask(t, catMap.get(t.categoryId)?.kind, minsLeft),
     }))
     .filter((s) => s.score >= 0)
     .sort((a, b) => b.score - a.score);
@@ -317,7 +319,7 @@ export function buildStabilizerStackSplit(
   const fillFromScored = (
     scoredList: { task: Task; score: number }[],
     cap: number,
-    minsLeft: number
+    budget: number
   ): Task[] => {
     const result: Task[] = [];
     const kindCount: Record<string, number> = {};
@@ -325,7 +327,7 @@ export function buildStabilizerStackSplit(
     for (const { task } of scoredList) {
       if (result.length >= cap) continue;
       const est = task.estimateMinutes ?? 15;
-      if (usedMinutes + est > minsLeft && usedMinutes > 0) continue;
+      if (usedMinutes + est > budget && usedMinutes > 0) continue;
       const kind = catMap.get(task.categoryId)?.kind ?? "";
       if ((kindCount[kind] ?? 0) >= 2 && scoredList.length > cap) continue;
       result.push(task);
@@ -338,7 +340,7 @@ export function buildStabilizerStackSplit(
   const suggested = fillFromScored(
     scored,
     maxTasks - pinned.length,
-    Math.max(0, availableMinutes - pinnedMins)
+    minsLeft
   );
 
   return { pinned, suggested };
