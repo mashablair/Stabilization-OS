@@ -13,13 +13,14 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Features
 
-- **Today Stack** — Choose your daily role (Stabilizer / Builder / Caregiver), set available minutes, and focus on 3-5 prioritized tasks
+- **Today Stack** — Choose your daily role (Stabilizer / Builder), set available minutes, and focus on up to 5 tasks. Pin tasks you want; the algorithm suggests the rest. A collapsible **Done Today** section celebrates completed tasks with motivational messages.
+- **All Tasks** — Dedicated page (main nav) to browse all active tasks by domain, with a collapsible **Done** section containing **Completed** and **Archived** tabs. Archive tasks to declutter without losing history.
 - **Categories** — Organize tasks into LEGAL, MONEY, MAINTENANCE, CAREGIVER domains with context cards (why, win condition, script)
-- **Task Detail** — Inline editing, subtasks, context cards (why / next micro-step / reframe), priority, due dates, money impact
+- **Task Detail** — Inline editing, subtasks with auto-completion (marking all subtasks done auto-completes the task), context cards (why / next micro-step / reframe), priority, due dates, money impact. Tasks track a `completedAt` timestamp for accurate reporting.
 - **Focus Timer** — Start/pause/stop timer per task; persisted in IndexedDB so page refresh won't lose time
 - **Dashboard** — Weekly stats (tasks completed, time tracked, money recovered, open loops), time allocation chart, open loops trend, friction log
-- **Weekly Review** — Guided 10-15 minute wizard with estimate mismatch review, friction reflection, category focus, and smallest next step
-- **Settings** — Export/import JSON share bundles, CSV exports (tasks + time entries), dark mode toggle, data reset
+- **Weekly Review** — Guided wizard that starts with a **Wins** step highlighting completed tasks, time invested, and money recovered for the week, followed by estimate mismatches, friction reflection, category focus, and smallest next step
+- **Settings** — Export/import JSON share bundles, CSV exports (tasks + time entries), dark mode toggle, data reset. Accessible via the gear icon in the header.
 
 ## Data Storage
 
@@ -34,7 +35,11 @@ All data is stored locally in your browser using IndexedDB (via Dexie.js) for th
 
 ## Seed Data
 
-On first run, the app automatically creates 4 categories (LEGAL, MONEY, MAINTENANCE, CAREGIVER) and 7 sample tasks. To re-seed, use the **Reset All Data** option in Settings and reload the page.
+On first run, the app automatically creates 4 categories (LEGAL, MONEY, MAINTENANCE, CAREGIVER) and 10 sample tasks. To re-seed, use the **Reset All Data** option in Settings and reload the page.
+
+## Task Lifecycle
+
+Tasks flow through these statuses: **BACKLOG** → **TODAY** → **IN_PROGRESS** → **DONE** → **ARCHIVED**. Tasks can also be set to **PENDING** (waiting) with an optional future action date. Completing all subtasks on a task automatically marks it as DONE. Undoing a completion always returns the task to BACKLOG.
 
 ## Tech Stack
 
@@ -63,5 +68,5 @@ npm run preview
    - **Output directory:** `dist`
    - **Root directory:** (leave empty if project root)
 3. **Node version:** Use Node.js 18 or later (set via Environment Variables in Cloudflare dashboard: `NODE_VERSION` = `18`).
-4. **SPA routing:** The `public/_redirects` file is included in the build and configures Cloudflare Pages to serve `index.html` for all routes (status 200), so deep links and page refreshes work correctly.
+4. **SPA routing:** The `public/_redirects` file configures Cloudflare Pages to serve `index.html` for all routes (status 200), so deep links and page refreshes work. Unknown routes redirect to the homepage.
 5. **Custom domain:** In your Cloudflare Pages project, go to **Custom domains** → **Set up a custom domain** and follow the steps to add your domain.

@@ -2,7 +2,7 @@ import Dexie, { type EntityTable } from "dexie";
 
 export type TaskDomain = "LIFE_ADMIN" | "BUSINESS";
 export type CategoryKind = "LEGAL" | "MONEY" | "MAINTENANCE" | "CAREGIVER";
-export type TaskStatus = "BACKLOG" | "TODAY" | "IN_PROGRESS" | "PENDING" | "DONE";
+export type TaskStatus = "BACKLOG" | "TODAY" | "IN_PROGRESS" | "PENDING" | "DONE" | "ARCHIVED";
 
 export interface Category {
   id: string;
@@ -31,6 +31,7 @@ export interface Task {
   contextCard: { why: string; nextMicroStep: string; reframe: string };
   createdAt: string;
   updatedAt: string;
+  completedAt?: string;
   subtasks: Array<{ id: string; title: string; done: boolean }>;
 }
 
@@ -109,7 +110,7 @@ export function isWaiting(task: Task, now = Date.now()): boolean {
 }
 
 export function isActionable(task: Task, now = Date.now()): boolean {
-  if (task.status === "DONE") return false;
+  if (task.status === "DONE" || task.status === "ARCHIVED") return false;
   if (task.status !== "PENDING") return true;
   return !task.nextActionAt || new Date(task.nextActionAt).getTime() <= now;
 }
@@ -125,6 +126,26 @@ export async function transitionDuePendingTasks(): Promise<number> {
     }
   }
   return count;
+}
+
+export async function markTaskDone(taskId: string): Promise<void> {
+  const now = nowISO();
+  await db.tasks.update(taskId, { status: "DONE", completedAt: now, updatedAt: now });
+}
+
+export async function markTaskArchived(taskId: string): Promise<void> {
+  const now = nowISO();
+  const task = await db.tasks.get(taskId);
+  await db.tasks.update(taskId, {
+    status: "ARCHIVED",
+    completedAt: task?.completedAt ?? now,
+    updatedAt: now,
+  });
+}
+
+export async function unmarkTaskDone(taskId: string): Promise<void> {
+  const now = nowISO();
+  await db.tasks.update(taskId, { status: "BACKLOG", completedAt: undefined, updatedAt: now });
 }
 
 // --- Scoring ---

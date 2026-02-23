@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, buildStabilizerStackSplit, getWaitingTasks, isActionable, nowISO } from "../db";
+import { db, buildStabilizerStackSplit, getWaitingTasks, isActionable, nowISO, unmarkTaskDone } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
 import QuickEntryModal from "../components/QuickEntryModal";
 import AllTasksDrawer from "../components/AllTasksDrawer";
@@ -33,6 +33,7 @@ export default function TodayPage() {
   const [showAllTasksDrawer, setShowAllTasksDrawer] = useState(false);
   const [tab, setTab] = useState<Tab>("Stabilizer");
   const [waitingOpen, setWaitingOpen] = useState(false);
+  const [doneOpen, setDoneOpen] = useState(true);
   const timer = useTimer();
 
   const availMins = settings?.availableMinutes ?? 120;
@@ -55,6 +56,28 @@ export default function TodayPage() {
     () => getWaitingTasks(allTasks, tab === "Stabilizer" ? "LIFE_ADMIN" : "BUSINESS"),
     [allTasks, tab]
   );
+
+  const todayStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, []);
+
+  const doneToday = useMemo(() => {
+    const domain = tab === "Stabilizer" ? "LIFE_ADMIN" : "BUSINESS";
+    return allTasks
+      .filter(
+        (t) =>
+          t.domain === domain &&
+          (t.status === "DONE" || t.status === "ARCHIVED") &&
+          t.completedAt &&
+          new Date(t.completedAt).getTime() >= todayStart
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime()
+      );
+  }, [allTasks, tab, todayStart]);
 
   const todayTasks = tab === "Stabilizer" ? stabilizerTasks : builderActionable;
 
@@ -409,6 +432,76 @@ export default function TodayPage() {
             )}
           </div>
         </section>
+
+        {/* Done Today Section */}
+        {doneToday.length > 0 && (
+          <section className="flex flex-col">
+            <button
+              type="button"
+              onClick={() => setDoneOpen(!doneOpen)}
+              className="flex items-center gap-3 py-3 text-left group"
+            >
+              <span className={`material-symbols-outlined text-slate-400 transition-transform ${doneOpen ? "rotate-90" : ""}`}>
+                chevron_right
+              </span>
+              <h3 className="text-lg font-bold text-green-600 dark:text-green-400 group-hover:text-green-500 transition-colors flex items-center gap-2">
+                <span className="material-symbols-outlined text-xl">task_alt</span>
+                Done Today
+              </h3>
+              <span className="px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold">
+                {doneToday.length}
+              </span>
+            </button>
+
+            {doneOpen && (
+              <div className="flex flex-col gap-3 mt-2">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-xl border border-green-200 dark:border-green-800/40 p-4 flex items-center gap-3">
+                  <span className="material-symbols-outlined text-2xl text-green-500">celebration</span>
+                  <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                    {doneToday.length === 1
+                      ? "You knocked one out! Every task closed is a loop that stops draining your energy."
+                      : doneToday.length < 4
+                        ? `${doneToday.length} tasks done — you're building real momentum. Keep going!`
+                        : `${doneToday.length} tasks done today — incredible! You're proving to yourself what's possible.`}
+                  </p>
+                </div>
+
+                {doneToday.map((task) => {
+                  const cat = catMap.get(task.categoryId);
+                  return (
+                    <div
+                      key={task.id}
+                      className="bg-white/40 dark:bg-card-dark/30 border border-green-200/50 dark:border-green-800/20 rounded-xl p-4 flex items-center justify-between gap-4"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <button
+                          onClick={() => unmarkTaskDone(task.id)}
+                          className="size-6 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity"
+                          title="Undo"
+                        >
+                          <span className="material-symbols-outlined text-white text-sm">check</span>
+                        </button>
+                        <Link to={`/tasks/${task.id}`} className="flex-1 min-w-0 hover:text-primary transition-colors">
+                          <h4 className="font-semibold truncate text-slate-400 line-through text-sm">{task.title}</h4>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
+                            {cat && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-100 dark:bg-border-dark">
+                                {cat.name}
+                              </span>
+                            )}
+                            {task.actualSecondsTotal > 0 && (
+                              <span>{formatMinutes(Math.round(task.actualSecondsTotal / 60))}</span>
+                            )}
+                          </div>
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Waiting Section */}
         {waitingTasks.length > 0 && (

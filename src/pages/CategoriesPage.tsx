@@ -31,7 +31,7 @@ export default function CategoriesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
         {categories.map((cat) => {
           const catTasks = getTasksForCategory(cat.id);
-          const doneTasks = catTasks.filter((t) => t.status === "DONE").length;
+          const doneTasks = catTasks.filter((t) => t.status === "DONE" || t.status === "ARCHIVED").length;
           const totalTasks = catTasks.length;
 
           return (

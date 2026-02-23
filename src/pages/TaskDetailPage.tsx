@@ -1,10 +1,10 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, generateId, nowISO } from "../db";
+import { db, generateId, nowISO, markTaskDone, unmarkTaskDone } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
 import { useState } from "react";
 
-const STATUS_OPTIONS = ["BACKLOG", "TODAY", "IN_PROGRESS", "PENDING", "DONE"] as const;
+const STATUS_OPTIONS = ["BACKLOG", "TODAY", "IN_PROGRESS", "PENDING", "DONE", "ARCHIVED"] as const;
 const PRIORITY_LABELS: Record<number, string> = {
   1: "Critical",
   2: "High",
@@ -60,6 +60,9 @@ export default function TaskDetailPage() {
       s.id === subId ? { ...s, done: !s.done } : s
     );
     await update({ subtasks: updated });
+    if (updated.length > 0 && updated.every((s) => s.done) && task.status !== "DONE") {
+      await markTaskDone(task.id);
+    }
   };
 
   const removeSubtask = async (subId: string) => {
@@ -102,9 +105,13 @@ export default function TaskDetailPage() {
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-4">
               <button
-                onClick={() =>
-                  update({ status: task.status === "DONE" ? "TODAY" : "DONE" })
-                }
+                onClick={async () => {
+                  if (task.status === "DONE") {
+                    await unmarkTaskDone(task.id);
+                  } else {
+                    await markTaskDone(task.id);
+                  }
+                }}
                 className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${
                   task.status === "DONE"
                     ? "bg-gradient-accent border-transparent"

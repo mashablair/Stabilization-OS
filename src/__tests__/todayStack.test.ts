@@ -280,6 +280,10 @@ describe("isActionable", () => {
     expect(isActionable(makeTask({ status: "DONE" }))).toBe(false);
   });
 
+  it("ARCHIVED is NOT actionable", () => {
+    expect(isActionable(makeTask({ status: "ARCHIVED" }))).toBe(false);
+  });
+
   it("PENDING + future nextActionAt is NOT actionable", () => {
     expect(isActionable(makeTask({ status: "PENDING", nextActionAt: FUTURE }))).toBe(false);
   });

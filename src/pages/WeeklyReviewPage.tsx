@@ -4,6 +4,7 @@ import { db, generateId, nowISO } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
 
 const STEPS = [
+  { key: "wins", label: "Wins" },
   { key: "overview", label: "Overview" },
   { key: "friction", label: "Friction" },
   { key: "focus", label: "Category Focus" },
@@ -22,11 +23,39 @@ export default function WeeklyReviewPage() {
   const [scariestNextStep, setScariestNextStep] = useState("");
   const [saved, setSaved] = useState(false);
 
+  const weekAgo = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d;
+  }, []);
+
+  const recentWins = useMemo(() => {
+    return tasks
+      .filter(
+        (t) =>
+          (t.status === "DONE" || t.status === "ARCHIVED") &&
+          t.completedAt &&
+          new Date(t.completedAt) >= weekAgo
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime()
+      );
+  }, [tasks, weekAgo]);
+
+  const winStats = useMemo(() => {
+    const totalTime = recentWins.reduce((s, t) => s + t.actualSecondsTotal, 0);
+    const totalMoney = recentWins
+      .filter((t) => t.moneyImpact && t.moneyImpact > 0)
+      .reduce((s, t) => s + (t.moneyImpact ?? 0), 0);
+    return { count: recentWins.length, totalMinutes: Math.round(totalTime / 60), totalMoney };
+  }, [recentWins]);
+
   const mismatches = useMemo(() => {
     return tasks
       .filter(
         (t) =>
-          t.status === "DONE" &&
+          (t.status === "DONE" || t.status === "ARCHIVED") &&
           t.estimateMinutes &&
           t.actualSecondsTotal > 0
       )
@@ -83,6 +112,73 @@ export default function WeeklyReviewPage() {
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-8 min-h-[400px] flex flex-col">
         {step === 0 && (
           <div className="flex-1 flex flex-col gap-6">
+            <h2 className="text-2xl font-bold flex items-center gap-3">
+              <span className="material-symbols-outlined text-3xl text-gradient">emoji_events</span>
+              This Week's Wins
+            </h2>
+            <p className="text-slate-500 text-sm">
+              Before looking at what's next, let's acknowledge what you've accomplished.
+            </p>
+
+            {recentWins.length === 0 ? (
+              <div className="text-center py-8">
+                <span className="material-symbols-outlined text-4xl text-slate-300 mb-2 block">hourglass_empty</span>
+                <p className="text-slate-400 italic">
+                  No completed tasks this week — that's okay. Every week is a fresh start.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-xl border border-green-200 dark:border-green-800/40 text-center">
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">{winStats.count}</p>
+                    <p className="text-xs font-semibold text-green-500 uppercase tracking-wider mt-1">Tasks Done</p>
+                  </div>
+                  <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800/40 text-center">
+                    <p className="text-2xl font-bold text-gradient">{formatMinutes(winStats.totalMinutes)}</p>
+                    <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mt-1">Time Invested</p>
+                  </div>
+                  <div className="bg-pink-50 dark:bg-pink-950/20 p-4 rounded-xl border border-pink-200 dark:border-pink-800/40 text-center">
+                    <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">
+                      {winStats.totalMoney > 0 ? `$${winStats.totalMoney.toFixed(0)}` : "—"}
+                    </p>
+                    <p className="text-xs font-semibold text-pink-500 uppercase tracking-wider mt-1">Money Recovered</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                  {recentWins.map((t) => (
+                    <div
+                      key={t.id}
+                      className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
+                    >
+                      <span className="material-symbols-outlined text-green-500 text-sm">check_circle</span>
+                      <span className="font-medium text-sm flex-1 truncate">{t.title}</span>
+                      {t.completedAt && (
+                        <span className="text-xs text-slate-400 shrink-0">
+                          {new Date(t.completedAt).toLocaleDateString(undefined, { weekday: "short" })}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-xl p-4 border border-green-200/50 dark:border-green-800/30">
+                  <p className="text-sm font-medium text-green-700 dark:text-green-300 italic text-center">
+                    {recentWins.length >= 5
+                      ? "Outstanding week. You're proving that steady progress beats perfection."
+                      : recentWins.length >= 3
+                        ? "Solid progress. Each task you close lightens the mental load."
+                        : "Every completed task is evidence of your capability. Build on this."}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {step === 1 && (
+          <div className="flex-1 flex flex-col gap-6">
             <h2 className="text-2xl font-bold">
               Top Estimate Mismatches
             </h2>
@@ -117,7 +213,7 @@ export default function WeeklyReviewPage() {
           </div>
         )}
 
-        {step === 1 && (
+        {step === 2 && (
           <div className="flex-1 flex flex-col gap-6">
             <h2 className="text-2xl font-bold">
               What created the most friction?
@@ -136,7 +232,7 @@ export default function WeeklyReviewPage() {
           </div>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <div className="flex-1 flex flex-col gap-6">
             <h2 className="text-2xl font-bold">
               Which category needs more dedicated blocks?
@@ -175,7 +271,7 @@ export default function WeeklyReviewPage() {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <div className="flex-1 flex flex-col gap-6">
             <h2 className="text-2xl font-bold">
               What's the smallest next step for the scariest task?
@@ -194,7 +290,7 @@ export default function WeeklyReviewPage() {
           </div>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <div className="flex-1 flex flex-col items-center justify-center text-center gap-6">
             {saved ? (
               <>

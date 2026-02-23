@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, nowISO, type TaskStatus } from "../db";
+import { db, nowISO, markTaskDone, unmarkTaskDone, type TaskStatus } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
 
 export default function CategoryDetailPage() {
@@ -21,7 +21,7 @@ export default function CategoryDetailPage() {
 
   const totalEstimate = tasks.reduce((s, t) => s + (t.estimateMinutes ?? 0), 0);
   const totalActual = tasks.reduce((s, t) => s + t.actualSecondsTotal, 0);
-  const doneTasks = tasks.filter((t) => t.status === "DONE");
+  const doneTasks = tasks.filter((t) => t.status === "DONE" || t.status === "ARCHIVED");
   const completionPct = tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0;
 
   const statusOrder: Record<TaskStatus, number> = {
@@ -30,6 +30,7 @@ export default function CategoryDetailPage() {
     BACKLOG: 2,
     PENDING: 3,
     DONE: 4,
+    ARCHIVED: 5,
   };
 
   return (
@@ -74,9 +75,9 @@ export default function CategoryDetailPage() {
                   onClick={async (e) => {
                     e.preventDefault();
                     if (task.status === "DONE") {
-                      await db.tasks.update(task.id, { status: "BACKLOG", updatedAt: nowISO() });
+                      await unmarkTaskDone(task.id);
                     } else {
-                      await db.tasks.update(task.id, { status: "DONE", updatedAt: nowISO() });
+                      await markTaskDone(task.id);
                     }
                   }}
                   className={`size-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${

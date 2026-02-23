@@ -19,10 +19,10 @@ const logoSvg = (
 
 const navItems = [
   { to: "/", label: "Today", icon: "layers" },
+  { to: "/today/all", label: "All Tasks", icon: "checklist" },
   { to: "/categories", label: "Categories", icon: "category" },
   { to: "/dashboard", label: "Dashboard", icon: "grid_view" },
   { to: "/review", label: "Review", icon: "rate_review" },
-  { to: "/settings", label: "Settings", icon: "settings" },
 ];
 
 export default function Layout() {
@@ -62,19 +62,34 @@ export default function Layout() {
             ))}
           </nav>
 
-          <button
-            onClick={async () => {
-              await db.appSettings.update("default", {
-                darkMode: !isDark,
-              });
-            }}
-            className="flex size-10 cursor-pointer items-center justify-center rounded-lg bg-slate-100 dark:bg-card-dark text-slate-600 dark:text-slate-300 hover:bg-primary/10 transition-colors"
-            title="Toggle dark mode"
-          >
-            <span className="material-symbols-outlined">
-              {isDark ? "light_mode" : "dark_mode"}
-            </span>
-          </button>
+          <div className="flex items-center gap-2">
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                `flex size-10 items-center justify-center rounded-lg transition-colors ${
+                  isActive
+                    ? "bg-primary/10 text-primary"
+                    : "bg-slate-100 dark:bg-card-dark text-slate-600 dark:text-slate-300 hover:bg-primary/10"
+                }`
+              }
+              title="Settings"
+            >
+              <span className="material-symbols-outlined">settings</span>
+            </NavLink>
+            <button
+              onClick={async () => {
+                await db.appSettings.update("default", {
+                  darkMode: !isDark,
+                });
+              }}
+              className="flex size-10 cursor-pointer items-center justify-center rounded-lg bg-slate-100 dark:bg-card-dark text-slate-600 dark:text-slate-300 hover:bg-primary/10 transition-colors"
+              title="Toggle dark mode"
+            >
+              <span className="material-symbols-outlined">
+                {isDark ? "light_mode" : "dark_mode"}
+              </span>
+            </button>
+          </div>
         </header>
 
         <main className="flex-1">

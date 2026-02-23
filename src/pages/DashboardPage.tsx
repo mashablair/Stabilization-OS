@@ -24,7 +24,8 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => {
     const recentDone = tasks.filter(
-      (t) => t.status === "DONE" && new Date(t.updatedAt) >= weekAgo
+      (t) => (t.status === "DONE" || t.status === "ARCHIVED") &&
+        t.completedAt && new Date(t.completedAt) >= weekAgo
     );
     const completedCount = recentDone.length;
 
@@ -38,7 +39,7 @@ export default function DashboardPage() {
       .reduce((s, t) => s + (t.moneyImpact ?? 0), 0);
 
     const openLoops = tasks.filter(
-      (t) => t.status !== "DONE"
+      (t) => t.status !== "DONE" && t.status !== "ARCHIVED"
     ).length;
 
     return { completedCount, totalSeconds, moneyRecovered, openLoops };
@@ -65,8 +66,8 @@ export default function DashboardPage() {
       const d = new Date(now.getTime() - i * 86400000);
       const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
       const openAtDay = tasks.filter((t) => {
-        if (t.status === "DONE") {
-          const doneDate = new Date(t.updatedAt);
+        if (t.status === "DONE" || t.status === "ARCHIVED") {
+          const doneDate = new Date(t.completedAt ?? t.updatedAt);
           return doneDate > d;
         }
         return new Date(t.createdAt) <= d;
@@ -95,7 +96,7 @@ export default function DashboardPage() {
     });
 
     tasks
-      .filter((t) => t.frictionNote && t.status !== "DONE")
+      .filter((t) => t.frictionNote && t.status !== "DONE" && t.status !== "ARCHIVED")
       .slice(0, 5)
       .forEach((t) => {
         items.push({
@@ -108,7 +109,7 @@ export default function DashboardPage() {
     const mismatches = tasks
       .filter(
         (t) =>
-          t.status === "DONE" &&
+          (t.status === "DONE" || t.status === "ARCHIVED") &&
           t.estimateMinutes &&
           t.actualSecondsTotal > 0
       )
