@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { db, type Category, type Task, type TimeEntry, type WeeklyReview } from "../db";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db, type Category, type Task, type TimeEntry, type WeeklyReview, type DailyCapacity } from "../db";
 
 interface ShareBundle {
   meta: { version: string; exportedAt: string; timezone: string };
@@ -7,21 +8,31 @@ interface ShareBundle {
   tasks: Task[];
   timeEntries: TimeEntry[];
   weeklyReviews?: WeeklyReview[];
+  dailyCapacity?: DailyCapacity[];
 }
 
 export default function SettingsPage() {
+  const settings = useLiveQuery(() => db.appSettings.get("default"));
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState("");
+
+  const stabilizerDefault = settings?.availableMinutes ?? 120;
+  const builderDefault = settings?.builderAvailableMinutes ?? 120;
+
+  const updateSetting = (field: string, value: number) => {
+    db.appSettings.update("default", { [field]: Math.max(0, value) });
+  };
 
   const exportBundle = async () => {
     const categories = await db.categories.toArray();
     const tasks = await db.tasks.toArray();
     const timeEntries = await db.timeEntries.toArray();
     const weeklyReviews = await db.weeklyReviews.toArray();
+    const dailyCapacity = await db.dailyCapacity.toArray();
 
     const bundle: ShareBundle = {
       meta: {
-        version: "1.0.0",
+        version: "1.1.0",
         exportedAt: new Date().toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
@@ -29,6 +40,7 @@ export default function SettingsPage() {
       tasks,
       timeEntries,
       weeklyReviews,
+      dailyCapacity,
     };
 
     const blob = new Blob([JSON.stringify(bundle, null, 2)], {
@@ -57,18 +69,22 @@ export default function SettingsPage() {
 
       await db.transaction(
         "rw",
-        [db.categories, db.tasks, db.timeEntries, db.weeklyReviews],
+        [db.categories, db.tasks, db.timeEntries, db.weeklyReviews, db.dailyCapacity],
         async () => {
           await db.categories.clear();
           await db.tasks.clear();
           await db.timeEntries.clear();
           await db.weeklyReviews.clear();
+          await db.dailyCapacity.clear();
 
           await db.categories.bulkAdd(bundle.categories);
           await db.tasks.bulkAdd(bundle.tasks);
           await db.timeEntries.bulkAdd(bundle.timeEntries);
           if (bundle.weeklyReviews) {
             await db.weeklyReviews.bulkAdd(bundle.weeklyReviews);
+          }
+          if (bundle.dailyCapacity) {
+            await db.dailyCapacity.bulkAdd(bundle.dailyCapacity);
           }
         }
       );
@@ -135,6 +151,55 @@ export default function SettingsPage() {
       </p>
 
       <div className="space-y-8">
+        {/* Daily Capacity Defaults */}
+        <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+          <h3 className="font-bold text-lg mb-1">Default Daily Capacity</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+            How many minutes per day you typically have available. You can
+            override this on any given day from the Today page.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                Stabilizer (Life Admin)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={stabilizerDefault}
+                  onChange={(e) =>
+                    updateSetting("availableMinutes", Number(e.target.value) || 0)
+                  }
+                  min={0}
+                  className="w-24 bg-slate-100 dark:bg-background-dark border-none rounded-xl px-4 py-3 text-lg font-bold focus:ring-2 focus:ring-primary transition-all text-center"
+                />
+                <span className="text-sm font-medium text-slate-400">
+                  minutes / day
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                Builder (Business)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={builderDefault}
+                  onChange={(e) =>
+                    updateSetting("builderAvailableMinutes", Number(e.target.value) || 0)
+                  }
+                  min={0}
+                  className="w-24 bg-slate-100 dark:bg-background-dark border-none rounded-xl px-4 py-3 text-lg font-bold focus:ring-2 focus:ring-primary transition-all text-center"
+                />
+                <span className="text-sm font-medium text-slate-400">
+                  minutes / day
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Export Bundle */}
         <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
           <h3 className="font-bold text-lg mb-2">Export Share Bundle</h3>

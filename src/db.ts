@@ -68,7 +68,15 @@ export interface AppSettings {
   id: string;
   role: string;
   availableMinutes: number;
+  builderAvailableMinutes: number;
   darkMode: boolean;
+}
+
+export interface DailyCapacity {
+  id: string;
+  date: string;
+  domain: TaskDomain;
+  minutes: number;
 }
 
 const db = new Dexie("StabilizationOS") as Dexie & {
@@ -78,6 +86,7 @@ const db = new Dexie("StabilizationOS") as Dexie & {
   weeklyReviews: EntityTable<WeeklyReview, "id">;
   timerState: EntityTable<TimerState, "id">;
   appSettings: EntityTable<AppSettings, "id">;
+  dailyCapacity: EntityTable<DailyCapacity, "id">;
 };
 
 db.version(1).stores({
@@ -89,6 +98,22 @@ db.version(1).stores({
   appSettings: "id",
 });
 
+db.version(2).stores({
+  categories: "id, kind",
+  tasks: "id, categoryId, status, priority, domain",
+  timeEntries: "id, taskId",
+  weeklyReviews: "id, weekStart",
+  timerState: "id",
+  appSettings: "id",
+  dailyCapacity: "id, [date+domain]",
+}).upgrade(tx => {
+  return tx.table("appSettings").toCollection().modify(settings => {
+    if (settings.builderAvailableMinutes === undefined) {
+      settings.builderAvailableMinutes = 120;
+    }
+  });
+});
+
 export { db };
 
 export function generateId(): string {
@@ -97,6 +122,48 @@ export function generateId(): string {
 
 export function nowISO(): string {
   return new Date().toISOString();
+}
+
+export function todayDateStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function getEffectiveMinutes(
+  settings: AppSettings | undefined,
+  dailyOverride: DailyCapacity | undefined,
+  domain: TaskDomain
+): number {
+  if (dailyOverride && dailyOverride.date === todayDateStr()) {
+    return dailyOverride.minutes;
+  }
+  if (domain === "BUSINESS") {
+    return settings?.builderAvailableMinutes ?? 120;
+  }
+  return settings?.availableMinutes ?? 120;
+}
+
+export async function setDailyCapacity(domain: TaskDomain, minutes: number): Promise<void> {
+  const date = todayDateStr();
+  const existing = await db.dailyCapacity
+    .where("[date+domain]")
+    .equals([date, domain])
+    .first();
+  if (existing) {
+    await db.dailyCapacity.update(existing.id, { minutes });
+  } else {
+    await db.dailyCapacity.add({ id: generateId(), date, domain, minutes });
+  }
+}
+
+export async function clearDailyCapacity(domain: TaskDomain): Promise<void> {
+  const date = todayDateStr();
+  const existing = await db.dailyCapacity
+    .where("[date+domain]")
+    .equals([date, domain])
+    .first();
+  if (existing) {
+    await db.dailyCapacity.delete(existing.id);
+  }
 }
 
 // --- Waiting / actionable helpers ---
@@ -212,7 +279,12 @@ export function buildStabilizerStackSplit(
     (t) => t.domain === "LIFE_ADMIN" && isActionable(t)
   );
 
+  const pinned = pool.filter((t) => t.status === "TODAY").slice(0, maxTasks);
+  const pinnedIds = new Set(pinned.map((t) => t.id));
+  const pinnedMins = pinned.reduce((s, t) => s + (t.estimateMinutes ?? 15), 0);
+
   const scored = pool
+    .filter((t) => !pinnedIds.has(t.id))
     .map((t) => ({
       task: t,
       score: scoreTask(t, catMap.get(t.categoryId)?.kind, availableMinutes),
@@ -223,14 +295,13 @@ export function buildStabilizerStackSplit(
   const fillFromScored = (
     scoredList: { task: Task; score: number }[],
     cap: number,
-    minsLeft: number,
-    excludeIds: Set<string>
+    minsLeft: number
   ): Task[] => {
     const result: Task[] = [];
     const kindCount: Record<string, number> = {};
     let usedMinutes = 0;
     for (const { task } of scoredList) {
-      if (result.length >= cap || excludeIds.has(task.id)) continue;
+      if (result.length >= cap) continue;
       const est = task.estimateMinutes ?? 15;
       if (usedMinutes + est > minsLeft && usedMinutes > 0) continue;
       const kind = catMap.get(task.categoryId)?.kind ?? "";
@@ -242,15 +313,10 @@ export function buildStabilizerStackSplit(
     return result;
   };
 
-  const pinnedScored = scored.filter((s) => s.task.status === "TODAY");
-  const pinned = fillFromScored(pinnedScored, maxTasks, Infinity, new Set());
-  const pinnedIds = new Set(pinned.map((t) => t.id));
-  const pinnedMins = pinned.reduce((s, t) => s + (t.estimateMinutes ?? 15), 0);
   const suggested = fillFromScored(
     scored,
     maxTasks - pinned.length,
-    Math.max(0, availableMinutes - pinnedMins),
-    pinnedIds
+    Math.max(0, availableMinutes - pinnedMins)
   );
 
   return { pinned, suggested };
@@ -576,6 +642,7 @@ export async function seedDatabase() {
     id: "default",
     role: "Stabilizer",
     availableMinutes: 120,
+    builderAvailableMinutes: 120,
     darkMode: false,
   });
 }

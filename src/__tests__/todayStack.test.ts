@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   scoreTask,
   buildStabilizerStack,
@@ -6,9 +6,12 @@ import {
   isWaiting,
   isActionable,
   getWaitingTasks,
+  getEffectiveMinutes,
   type Task,
   type Category,
   type CategoryKind,
+  type AppSettings,
+  type DailyCapacity,
 } from "../db";
 
 function makeTask(overrides: Partial<Task> = {}): Task {
@@ -380,6 +383,69 @@ describe("buildStabilizerStackSplit", () => {
     expect(stack[0].title).toBe("A");
     expect(stack[1].title).toBe("B");
   });
+
+  it("all user-pinned (TODAY) tasks show in Today Stack even when same category kind", () => {
+    const caregiver1 = makeTask({
+      status: "TODAY",
+      title: "Mom's appointment",
+      categoryId: "cat-care",
+      estimateMinutes: 15,
+    });
+    const caregiver2 = makeTask({
+      status: "TODAY",
+      title: "Kids school",
+      categoryId: "cat-care",
+      estimateMinutes: 20,
+    });
+    const caregiver3 = makeTask({
+      status: "TODAY",
+      title: "Take Dad to dentist",
+      categoryId: "cat-care",
+      estimateMinutes: 25,
+    });
+    const { pinned: outPinned } = buildStabilizerStackSplit(
+      [caregiver1, caregiver2, caregiver3],
+      categories,
+      120,
+      5
+    );
+    expect(outPinned).toHaveLength(3);
+    expect(outPinned.map((t) => t.title)).toContain("Take Dad to dentist");
+  });
+
+  it("pinned tasks appear even when their estimate exceeds availableMinutes", () => {
+    const pinned = makeTask({
+      status: "TODAY",
+      title: "Take Dad to dentist",
+      categoryId: "cat-care",
+      estimateMinutes: 25,
+    });
+    const { pinned: outPinned } = buildStabilizerStackSplit(
+      [pinned],
+      categories,
+      10,
+      5
+    );
+    expect(outPinned).toHaveLength(1);
+    expect(outPinned[0].title).toBe("Take Dad to dentist");
+  });
+
+  it("pinned tasks appear even when they have blockedByTaskIds", () => {
+    const pinned = makeTask({
+      status: "TODAY",
+      title: "Blocked but pinned",
+      categoryId: "cat-legal",
+      blockedByTaskIds: ["some-other-task"],
+    });
+    const { pinned: outPinned } = buildStabilizerStackSplit(
+      [pinned],
+      categories,
+      120,
+      5
+    );
+    expect(outPinned).toHaveLength(1);
+    expect(outPinned[0].title).toBe("Blocked but pinned");
+  });
 });
 
 describe("scoreTask excludes waiting PENDING tasks", () => {
@@ -520,5 +586,52 @@ describe("task lifecycle transitions", () => {
     const subtasks: Array<{ id: string; title: string; done: boolean }> = [];
     const allDone = subtasks.length > 0 && subtasks.every((s) => s.done);
     expect(allDone).toBe(false);
+  });
+});
+
+// ── getEffectiveMinutes ──────────────────────────────────────────────
+
+describe("getEffectiveMinutes", () => {
+  const baseSettings: AppSettings = {
+    id: "default",
+    role: "Stabilizer",
+    availableMinutes: 120,
+    builderAvailableMinutes: 90,
+    darkMode: false,
+  };
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  it("returns stabilizer default when no daily override", () => {
+    expect(getEffectiveMinutes(baseSettings, undefined, "LIFE_ADMIN")).toBe(120);
+  });
+
+  it("returns builder default when no daily override", () => {
+    expect(getEffectiveMinutes(baseSettings, undefined, "BUSINESS")).toBe(90);
+  });
+
+  it("returns daily override when date matches today (LIFE_ADMIN)", () => {
+    const override: DailyCapacity = { id: "dc1", date: todayStr, domain: "LIFE_ADMIN", minutes: 45 };
+    expect(getEffectiveMinutes(baseSettings, override, "LIFE_ADMIN")).toBe(45);
+  });
+
+  it("returns daily override when date matches today (BUSINESS)", () => {
+    const override: DailyCapacity = { id: "dc2", date: todayStr, domain: "BUSINESS", minutes: 60 };
+    expect(getEffectiveMinutes(baseSettings, override, "BUSINESS")).toBe(60);
+  });
+
+  it("ignores stale override from a different date", () => {
+    const override: DailyCapacity = { id: "dc3", date: "2020-01-01", domain: "LIFE_ADMIN", minutes: 10 };
+    expect(getEffectiveMinutes(baseSettings, override, "LIFE_ADMIN")).toBe(120);
+  });
+
+  it("falls back to 120 when settings is undefined", () => {
+    expect(getEffectiveMinutes(undefined, undefined, "LIFE_ADMIN")).toBe(120);
+    expect(getEffectiveMinutes(undefined, undefined, "BUSINESS")).toBe(120);
+  });
+
+  it("override of 0 minutes is respected", () => {
+    const override: DailyCapacity = { id: "dc4", date: todayStr, domain: "LIFE_ADMIN", minutes: 0 };
+    expect(getEffectiveMinutes(baseSettings, override, "LIFE_ADMIN")).toBe(0);
   });
 });

@@ -9,6 +9,8 @@ import {
   markTaskDone,
   unmarkTaskDone,
   markTaskArchived,
+  getEffectiveMinutes,
+  todayDateStr,
 } from "../db";
 import type { Task } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
@@ -24,7 +26,12 @@ export default function AllTasksPage() {
   const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
   const allTasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
   const settings = useLiveQuery(() => db.appSettings.get("default"));
-  const availMins = settings?.availableMinutes ?? 120;
+  const today = todayDateStr();
+  const dailyOverride = useLiveQuery(
+    () => db.dailyCapacity.where("[date+domain]").equals([today, "LIFE_ADMIN"]).first(),
+    [today]
+  );
+  const availMins = getEffectiveMinutes(settings, dailyOverride, "LIFE_ADMIN");
 
   const [doneOpen, setDoneOpen] = useState(false);
   const [doneTab, setDoneTab] = useState<DoneTab>("Completed");

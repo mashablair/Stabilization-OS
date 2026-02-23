@@ -1,10 +1,12 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, buildStabilizerStackSplit, getWaitingTasks, isActionable, nowISO, unmarkTaskDone } from "../db";
+import { db, buildStabilizerStackSplit, getWaitingTasks, isActionable, nowISO, unmarkTaskDone, getEffectiveMinutes, setDailyCapacity, clearDailyCapacity, todayDateStr } from "../db";
+import type { TaskDomain } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
 import QuickEntryModal from "../components/QuickEntryModal";
 import AllTasksDrawer from "../components/AllTasksDrawer";
+import CapacityAdjustPopover from "../components/CapacityAdjustPopover";
 
 type Tab = "Stabilizer" | "Builder";
 
@@ -34,13 +36,32 @@ export default function TodayPage() {
   const [tab, setTab] = useState<Tab>("Stabilizer");
   const [waitingOpen, setWaitingOpen] = useState(false);
   const [doneOpen, setDoneOpen] = useState(true);
+  const [capacityPopoverOpen, setCapacityPopoverOpen] = useState(false);
   const timer = useTimer();
 
-  const availMins = settings?.availableMinutes ?? 120;
+  const today = todayDateStr();
+  const stabilizerDailyOverride = useLiveQuery(
+    () => db.dailyCapacity.where("[date+domain]").equals([today, "LIFE_ADMIN"]).first(),
+    [today]
+  );
+  const builderDailyOverride = useLiveQuery(
+    () => db.dailyCapacity.where("[date+domain]").equals([today, "BUSINESS"]).first(),
+    [today]
+  );
+
+  const stabilizerMins = getEffectiveMinutes(settings, stabilizerDailyOverride, "LIFE_ADMIN");
+  const builderMins = getEffectiveMinutes(settings, builderDailyOverride, "BUSINESS");
+  const availMins = tab === "Stabilizer" ? stabilizerMins : builderMins;
+  const currentDomain: TaskDomain = tab === "Stabilizer" ? "LIFE_ADMIN" : "BUSINESS";
+  const currentOverride = tab === "Stabilizer" ? stabilizerDailyOverride : builderDailyOverride;
+  const currentDefault = tab === "Stabilizer"
+    ? (settings?.availableMinutes ?? 120)
+    : (settings?.builderAvailableMinutes ?? 120);
+  const isOverridden = !!currentOverride && currentOverride.date === today;
 
   const { pinned: stabilizerPinned, suggested: stabilizerSuggested } = useMemo(
-    () => buildStabilizerStackSplit(allTasks, categories, availMins, 5),
-    [allTasks, categories, availMins]
+    () => buildStabilizerStackSplit(allTasks, categories, stabilizerMins, 5),
+    [allTasks, categories, stabilizerMins]
   );
   const stabilizerTasks = [...stabilizerPinned, ...stabilizerSuggested];
 
@@ -86,6 +107,8 @@ export default function TodayPage() {
     0
   );
   const pct = Math.min((allocatedMins / Math.max(availMins, 1)) * 100, 100);
+
+  const closeCpPopoverOnTabSwitch = () => setCapacityPopoverOpen(false);
   const catMap = new Map(categories.map((c) => [c.id, c]));
 
   const makeActionable = async (taskId: string) => {
@@ -261,7 +284,7 @@ export default function TodayPage() {
               <button
                 key={t}
                 type="button"
-                onClick={() => { setTab(t); setWaitingOpen(false); }}
+                onClick={() => { setTab(t); setWaitingOpen(false); closeCpPopoverOnTabSwitch(); }}
                 className={`flex cursor-pointer h-12 flex-1 items-center justify-center overflow-hidden rounded-lg px-4 transition-all text-sm font-semibold ${
                   tab === t
                     ? "bg-gradient-accent text-white shadow-lg shadow-primary/20"
@@ -274,27 +297,39 @@ export default function TodayPage() {
           </div>
         </section>
 
-        {/* Capacity (Stabilizer only) */}
-        {tab === "Stabilizer" && (
+        {/* Capacity */}
+        {(tab === "Stabilizer" || (tab === "Builder" && builderActionable.length > 0)) && (
           <section className="flex flex-col items-center gap-4 bg-primary/5 p-6 rounded-2xl border border-primary/10">
             <div className="flex flex-col items-center gap-2">
               <h3 className="text-slate-700 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">
                 Available Capacity
               </h3>
-              <div className="flex items-center gap-3">
-                <input
-                  className="bg-transparent border-none text-5xl font-bold text-gradient focus:ring-0 p-0 w-32 text-center focus:outline-none"
-                  type="number"
-                  value={availMins}
-                  onChange={(e) =>
-                    db.appSettings.update("default", {
-                      availableMinutes: Number(e.target.value) || 0,
-                    })
-                  }
-                  min={0}
-                />
+              <div className="relative flex items-center gap-3">
+                <span className="text-5xl font-bold text-gradient">{availMins}</span>
                 <span className="text-2xl font-medium text-slate-400">minutes</span>
+                <button
+                  type="button"
+                  onClick={() => setCapacityPopoverOpen(!capacityPopoverOpen)}
+                  className="ml-1 size-8 rounded-lg border border-slate-200 dark:border-border-dark flex items-center justify-center text-slate-400 hover:text-primary hover:border-primary transition-all"
+                  title="Adjust today's capacity"
+                >
+                  <span className="material-symbols-outlined text-lg">tune</span>
+                </button>
+                <CapacityAdjustPopover
+                  open={capacityPopoverOpen}
+                  onClose={() => setCapacityPopoverOpen(false)}
+                  currentMinutes={availMins}
+                  defaultMinutes={currentDefault}
+                  isOverridden={isOverridden}
+                  onSave={(mins) => setDailyCapacity(currentDomain, mins)}
+                  onReset={() => clearDailyCapacity(currentDomain)}
+                />
               </div>
+              {isOverridden && (
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                  Adjusted for today (default: {currentDefault} min)
+                </span>
+              )}
             </div>
             <div className="w-full bg-slate-200 dark:bg-border-dark h-2 rounded-full overflow-hidden">
               <div

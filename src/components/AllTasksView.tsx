@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, buildStabilizerStackSplit, isActionable, nowISO } from "../db";
+import { db, buildStabilizerStackSplit, isActionable, nowISO, getEffectiveMinutes, todayDateStr } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
 import type { Task } from "../db";
 
@@ -17,7 +17,12 @@ export default function AllTasksView({ tab, embedded = false, onClose }: Props) 
   const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
   const allTasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
   const settings = useLiveQuery(() => db.appSettings.get("default"));
-  const availMins = settings?.availableMinutes ?? 120;
+  const today = todayDateStr();
+  const dailyOverride = useLiveQuery(
+    () => db.dailyCapacity.where("[date+domain]").equals([today, "LIFE_ADMIN"]).first(),
+    [today]
+  );
+  const availMins = getEffectiveMinutes(settings, dailyOverride, "LIFE_ADMIN");
 
   const stabilizerPool = allTasks.filter(
     (t) => t.domain === "LIFE_ADMIN" && isActionable(t)
