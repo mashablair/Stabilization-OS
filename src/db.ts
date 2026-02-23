@@ -79,6 +79,16 @@ export interface DailyCapacity {
   minutes: number;
 }
 
+export type WinTag = "life" | "biz" | "vitality" | "community";
+
+export interface Win {
+  id: string;
+  text: string;
+  date: string; // YYYY-MM-DD — when the win happened (or when logged if not specified)
+  tags: WinTag[];
+  createdAt: string;
+}
+
 const db = new Dexie("StabilizationOS") as Dexie & {
   categories: EntityTable<Category, "id">;
   tasks: EntityTable<Task, "id">;
@@ -87,6 +97,7 @@ const db = new Dexie("StabilizationOS") as Dexie & {
   timerState: EntityTable<TimerState, "id">;
   appSettings: EntityTable<AppSettings, "id">;
   dailyCapacity: EntityTable<DailyCapacity, "id">;
+  wins: EntityTable<Win, "id">;
 };
 
 db.version(1).stores({
@@ -112,6 +123,17 @@ db.version(2).stores({
       settings.builderAvailableMinutes = 120;
     }
   });
+});
+
+db.version(3).stores({
+  categories: "id, kind",
+  tasks: "id, categoryId, status, priority, domain",
+  timeEntries: "id, taskId",
+  weeklyReviews: "id, weekStart",
+  timerState: "id",
+  appSettings: "id",
+  dailyCapacity: "id, [date+domain]",
+  wins: "id, date, createdAt",
 });
 
 export { db };

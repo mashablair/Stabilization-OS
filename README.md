@@ -1,6 +1,6 @@
 # Stabilization OS
 
-A local-first personal web app for managing life-admin tasks with categories, subtasks, encouragement context, time tracking, and a progress dashboard.
+A local-first personal web app for managing life-admin tasks with categories, subtasks, encouragement context, time tracking, wins journaling, and a progress dashboard.
 
 ## How to Run
 
@@ -13,13 +13,14 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Features
 
-- **Today Stack** — Choose your daily role (Stabilizer / Builder) and focus on up to 5 tasks. Pin tasks you want; the algorithm suggests the rest. Adjust your **available capacity** per day with the tune icon — changes apply to today only, with separate budgets for Stabilizer and Builder. A collapsible **Done Today** section celebrates completed tasks with motivational messages.
+- **Today Stack** — Choose your daily role (Stabilizer / Builder) and focus on up to 5 tasks. Pin tasks you want; the algorithm suggests the rest. Mark tasks done with the ✓ checkmark icon next to each task. Adjust your **available capacity** per day with the tune icon — changes apply to today only, with separate budgets for Stabilizer and Builder. A collapsible **Done Today** section celebrates completed tasks with motivational messages. **Log a win** to record accomplishments beyond your task list (e.g. started building this app, did a face mask).
 - **All Tasks** — Dedicated page (main nav) to browse all active tasks by domain, with a collapsible **Done** section containing **Completed** and **Archived** tabs. Archive tasks to declutter without losing history.
 - **Categories** — Organize tasks into LEGAL, MONEY, MAINTENANCE, CAREGIVER domains with context cards (why, win condition, script)
 - **Task Detail** — Click the task name to edit it (display/edit mode prevents cursor jumping). Inline editing for other fields, subtasks with auto-completion (marking all subtasks done auto-completes the task), context cards (why / next micro-step / reframe), priority, due dates, money impact. Tasks track a `completedAt` timestamp for accurate reporting.
 - **Focus Timer** — Start/pause/stop timer per task; persisted in IndexedDB so page refresh won't lose time. **Add time** manually (minutes or `h:mm`) when you forget to start the timer; remove sessions from history via the × button. Session history and total update live.
 - **Dashboard** — Weekly stats (tasks completed, time tracked, money recovered, open loops), time allocation chart, open loops trend, friction log
-- **Weekly Review** — Guided wizard that starts with a **Wins** step highlighting completed tasks, time invested, and money recovered for the week, followed by estimate mismatches, friction reflection, category focus, and smallest next step
+- **Wins** — A dedicated page to log and browse accomplishments beyond your tracked tasks. Tag wins with life, biz, vitality, or community. Browse by week, month, quarter, or year. Quick-add from the Today page footer. Revisit during quarterly reviews or when you need a boost.
+- **Weekly Review** — Guided wizard that starts with a **Wins** step highlighting completed tasks, time invested, money recovered, and **other wins** you logged this week, followed by estimate mismatches, friction reflection, category focus, and smallest next step
 - **Settings** — Configure default daily capacity for Stabilizer and Builder, export/import JSON share bundles, CSV exports (tasks + time entries), dark mode toggle, data reset. Accessible via the gear icon in the header.
 
 ## Data Storage

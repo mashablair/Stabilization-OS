@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, generateId, nowISO } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
@@ -16,6 +17,7 @@ export default function WeeklyReviewPage() {
   const tasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
   const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
   const reviews = useLiveQuery(() => db.weeklyReviews.toArray()) ?? [];
+  const allWins = useLiveQuery(() => db.wins.toArray()) ?? [];
 
   const [step, setStep] = useState(0);
   const [friction, setFriction] = useState("");
@@ -50,6 +52,15 @@ export default function WeeklyReviewPage() {
       .reduce((s, t) => s + (t.moneyImpact ?? 0), 0);
     return { count: recentWins.length, totalMinutes: Math.round(totalTime / 60), totalMoney };
   }, [recentWins]);
+
+  const otherWinsThisWeek = useMemo(() => {
+    return allWins
+      .filter(
+        (w) =>
+          new Date(w.date) >= weekAgo
+      )
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [allWins, weekAgo]);
 
   const mismatches = useMemo(() => {
     return tasks
@@ -120,34 +131,43 @@ export default function WeeklyReviewPage() {
               Before looking at what's next, let's acknowledge what you've accomplished.
             </p>
 
-            {recentWins.length === 0 ? (
+            {recentWins.length === 0 && otherWinsThisWeek.length === 0 ? (
               <div className="text-center py-8">
                 <span className="material-symbols-outlined text-4xl text-slate-300 mb-2 block">hourglass_empty</span>
-                <p className="text-slate-400 italic">
+                <p className="text-slate-400 italic mb-4">
                   No completed tasks this week — that's okay. Every week is a fresh start.
                 </p>
+                <Link
+                  to="/wins"
+                  className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-base">add_circle</span>
+                  Log wins beyond your tasks
+                </Link>
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-xl border border-green-200 dark:border-green-800/40 text-center">
-                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">{winStats.count}</p>
-                    <p className="text-xs font-semibold text-green-500 uppercase tracking-wider mt-1">Tasks Done</p>
-                  </div>
-                  <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800/40 text-center">
-                    <p className="text-2xl font-bold text-gradient">{formatMinutes(winStats.totalMinutes)}</p>
-                    <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mt-1">Time Invested</p>
-                  </div>
-                  <div className="bg-pink-50 dark:bg-pink-950/20 p-4 rounded-xl border border-pink-200 dark:border-pink-800/40 text-center">
-                    <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">
-                      {winStats.totalMoney > 0 ? `$${winStats.totalMoney.toFixed(0)}` : "—"}
-                    </p>
-                    <p className="text-xs font-semibold text-pink-500 uppercase tracking-wider mt-1">Money Recovered</p>
-                  </div>
-                </div>
+                {recentWins.length > 0 && (
+                  <>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-xl border border-green-200 dark:border-green-800/40 text-center">
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{winStats.count}</p>
+                        <p className="text-xs font-semibold text-green-500 uppercase tracking-wider mt-1">Tasks Done</p>
+                      </div>
+                      <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-xl border border-purple-200 dark:border-purple-800/40 text-center">
+                        <p className="text-2xl font-bold text-gradient">{formatMinutes(winStats.totalMinutes)}</p>
+                        <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mt-1">Time Invested</p>
+                      </div>
+                      <div className="bg-pink-50 dark:bg-pink-950/20 p-4 rounded-xl border border-pink-200 dark:border-pink-800/40 text-center">
+                        <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">
+                          {winStats.totalMoney > 0 ? `$${winStats.totalMoney.toFixed(0)}` : "—"}
+                        </p>
+                        <p className="text-xs font-semibold text-pink-500 uppercase tracking-wider mt-1">Money Recovered</p>
+                      </div>
+                    </div>
 
-                <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                  {recentWins.map((t) => (
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {recentWins.map((t) => (
                     <div
                       key={t.id}
                       className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
@@ -160,7 +180,51 @@ export default function WeeklyReviewPage() {
                         </span>
                       )}
                     </div>
-                  ))}
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {otherWinsThisWeek.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-lg">celebration</span>
+                      Other wins this week
+                    </h4>
+                    <div className="space-y-2 max-h-[120px] overflow-y-auto">
+                      {otherWinsThisWeek.map((w) => (
+                        <div
+                          key={w.id}
+                          className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200/50 dark:border-amber-800/30"
+                        >
+                          <span className="material-symbols-outlined text-amber-500 text-sm">star</span>
+                          <span className="font-medium text-sm flex-1">{w.text}</span>
+                          {w.tags.length > 0 && (
+                            <div className="flex gap-1">
+                              {w.tags.map((t) => (
+                                <span
+                                  key={t}
+                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-200/50 dark:bg-amber-800/30 text-amber-700 dark:text-amber-300"
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <Link
+                    to="/wins"
+                    className="text-sm font-medium text-primary hover:underline flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-base">add_circle</span>
+                    Log wins beyond your tasks
+                  </Link>
                 </div>
 
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-xl p-4 border border-green-200/50 dark:border-green-800/30">
@@ -169,7 +233,9 @@ export default function WeeklyReviewPage() {
                       ? "Outstanding week. You're proving that steady progress beats perfection."
                       : recentWins.length >= 3
                         ? "Solid progress. Each task you close lightens the mental load."
-                        : "Every completed task is evidence of your capability. Build on this."}
+                        : recentWins.length > 0
+                          ? "Every completed task is evidence of your capability. Build on this."
+                          : "You logged wins beyond your tasks — that counts. Celebrate the full picture."}
                   </p>
                 </div>
               </>

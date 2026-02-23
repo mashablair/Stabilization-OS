@@ -23,6 +23,7 @@ const navItems = [
   { to: "/categories", label: "Categories", icon: "category" },
   { to: "/dashboard", label: "Dashboard", icon: "grid_view" },
   { to: "/review", label: "Review", icon: "rate_review" },
+  { to: "/wins", label: "Wins", icon: "emoji_events" },
 ];
 
 export default function Layout() {

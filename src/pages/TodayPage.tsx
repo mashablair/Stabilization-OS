@@ -1,12 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, buildStabilizerStackSplit, getWaitingTasks, isActionable, nowISO, unmarkTaskDone, getEffectiveMinutes, setDailyCapacity, clearDailyCapacity, todayDateStr } from "../db";
+import { db, buildStabilizerStackSplit, getWaitingTasks, isActionable, markTaskDone, nowISO, unmarkTaskDone, getEffectiveMinutes, setDailyCapacity, clearDailyCapacity, todayDateStr } from "../db";
 import type { TaskDomain } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
 import QuickEntryModal from "../components/QuickEntryModal";
 import AllTasksDrawer from "../components/AllTasksDrawer";
 import CapacityAdjustPopover from "../components/CapacityAdjustPopover";
+import LogWinPopover from "../components/LogWinPopover";
 
 type Tab = "Stabilizer" | "Builder";
 
@@ -33,6 +34,8 @@ export default function TodayPage() {
   const allTasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
   const [showModal, setShowModal] = useState(false);
   const [showAllTasksDrawer, setShowAllTasksDrawer] = useState(false);
+  const [logWinPopoverOpen, setLogWinPopoverOpen] = useState(false);
+  const logWinButtonRef = useRef<HTMLButtonElement>(null);
   const [tab, setTab] = useState<Tab>("Stabilizer");
   const [waitingOpen, setWaitingOpen] = useState(false);
   const [doneOpen, setDoneOpen] = useState(true);
@@ -160,10 +163,20 @@ export default function TodayPage() {
             {cat?.name ?? "—"}
           </span>
           <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                if (timer.activeTaskId === task.id) timer.stopTimer();
+                await markTaskDone(task.id);
+              }}
+              className="size-8 rounded-lg flex items-center justify-center text-green-500 hover:bg-green-50 dark:hover:bg-green-950/30 border border-green-200 dark:border-green-800/40 hover:border-green-400 dark:hover:border-green-600 transition-all"
+              title="Mark done"
+            >
+              <span className="material-symbols-outlined text-lg">check_circle</span>
+            </button>
             {showPinActions && isPinned && (
               <button
                 onClick={() => removeFromToday(task.id)}
-                className="text-xs text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-1"
+                className="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
                 title="Remove from today"
               >
                 <span className="material-symbols-outlined text-sm">push_pin</span>
@@ -172,7 +185,7 @@ export default function TodayPage() {
             {showPinActions && !isPinned && canPin && (
               <button
                 onClick={() => pinToToday(task.id)}
-                className="text-xs text-slate-400 hover:text-primary flex items-center gap-1"
+                className="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors"
                 title="Pin to today"
               >
                 <span className="material-symbols-outlined text-sm">add_circle</span>
@@ -609,9 +622,25 @@ export default function TodayPage() {
         )}
 
         <footer className="mt-8 flex flex-col items-center gap-4 py-8 border-t border-slate-200 dark:border-border-dark">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/5 text-primary rounded-full text-sm font-medium border border-primary/10">
-            <span className="material-symbols-outlined text-sm">spa</span>
-            Stay focused. One task at a time.
+          <div className="relative flex flex-col items-center gap-4">
+            <button
+              ref={logWinButtonRef}
+              type="button"
+              onClick={() => setLogWinPopoverOpen(!logWinPopoverOpen)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-accent text-white font-bold text-sm shadow-lg shadow-primary/20 hover:opacity-90 transition-all"
+            >
+              <span className="material-symbols-outlined text-lg">emoji_events</span>
+              Log a win
+            </button>
+            <LogWinPopover
+              open={logWinPopoverOpen}
+              onClose={() => setLogWinPopoverOpen(false)}
+              anchorRef={logWinButtonRef}
+            />
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/5 text-primary rounded-full text-sm font-medium border border-primary/10">
+              <span className="material-symbols-outlined text-sm">spa</span>
+              Stay focused. One task at a time.
+            </div>
           </div>
         </footer>
       </div>
