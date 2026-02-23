@@ -2,7 +2,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, generateId, nowISO, markTaskDone, unmarkTaskDone } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const STATUS_OPTIONS = ["BACKLOG", "TODAY", "IN_PROGRESS", "PENDING", "DONE", "ARCHIVED"] as const;
 const PRIORITY_LABELS: Record<number, string> = {
@@ -29,6 +29,14 @@ export default function TaskDetailPage() {
   ) ?? [];
   const timer = useTimer();
   const [newSubtask, setNewSubtask] = useState("");
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [addTimeInput, setAddTimeInput] = useState("");
+
+  useEffect(() => {
+    setIsEditingTitle(false);
+    setEditingTitle("");
+  }, [id]);
 
   if (!task) {
     return (
@@ -80,6 +88,50 @@ export default function TaskDetailPage() {
     .filter((e) => e.endAt)
     .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
 
+  const parseAddTimeInput = (value: string): number | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const match = trimmed.match(/^(\d+):(\d{1,2})$/);
+    if (match) {
+      const h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      if (m >= 60) return null;
+      return h * 60 + m;
+    }
+    const mins = parseInt(trimmed, 10);
+    if (!Number.isNaN(mins) && mins > 0) return mins;
+    return null;
+  };
+
+  const addManualTime = async () => {
+    const minutes = parseAddTimeInput(addTimeInput);
+    if (minutes == null || minutes <= 0) return;
+    const seconds = minutes * 60;
+    const now = nowISO();
+    const startAt = new Date(Date.now() - seconds * 1000).toISOString();
+    const entryId = generateId();
+    await db.timeEntries.add({
+      id: entryId,
+      taskId: task.id,
+      startAt,
+      endAt: now,
+      seconds,
+    });
+    await db.tasks.update(task.id, {
+      actualSecondsTotal: task.actualSecondsTotal + seconds,
+      updatedAt: now,
+    });
+    setAddTimeInput("");
+  };
+
+  const removeSession = async (entry: (typeof completedEntries)[0]) => {
+    await db.timeEntries.delete(entry.id);
+    await db.tasks.update(task.id, {
+      actualSecondsTotal: Math.max(0, task.actualSecondsTotal - entry.seconds),
+      updatedAt: nowISO(),
+    });
+  };
+
   return (
     <div className="max-w-7xl mx-auto w-full px-4 lg:px-10 py-8 pb-24 md:pb-8">
       <div className="flex items-center gap-2 mb-6 text-sm">
@@ -122,11 +174,42 @@ export default function TaskDetailPage() {
                   <span className="material-symbols-outlined text-white text-sm">check</span>
                 )}
               </button>
-              <input
-                className="text-3xl lg:text-4xl font-black tracking-tight bg-transparent border-none focus:ring-0 p-0 w-full focus:outline-none"
-                value={task.title}
-                onChange={(e) => update({ title: e.target.value })}
-              />
+              {isEditingTitle ? (
+                <input
+                  className="text-3xl lg:text-4xl font-black tracking-tight bg-transparent border-none focus:ring-0 p-0 w-full focus:outline-none border-b-2 border-primary"
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  onBlur={async () => {
+                    const trimmed = editingTitle.trim();
+                    if (trimmed && trimmed !== task.title) {
+                      await update({ title: trimmed });
+                    }
+                    setIsEditingTitle(false);
+                    setEditingTitle("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.currentTarget.blur();
+                    }
+                    if (e.key === "Escape") {
+                      setEditingTitle(task.title);
+                      setIsEditingTitle(false);
+                    }
+                  }}
+                  autoFocus
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingTitle(task.title);
+                    setIsEditingTitle(true);
+                  }}
+                  className="text-3xl lg:text-4xl font-black tracking-tight p-0 w-full text-left hover:opacity-80 transition-opacity min-h-[1.5em]"
+                >
+                  {task.title || <span className="text-slate-400 font-normal">Untitled task — click to rename</span>}
+                </button>
+              )}
             </div>
             <div className="flex flex-wrap gap-3 items-center pl-12">
               <span className={`px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${PRIORITY_COLORS[task.priority]}`}>
@@ -377,6 +460,27 @@ export default function TaskDetailPage() {
                 )}
               </div>
 
+              <div className="w-full flex items-center gap-2">
+                <span className="text-xs text-slate-500">Add time:</span>
+                <input
+                  type="text"
+                  placeholder="30 or 1:30"
+                  value={addTimeInput}
+                  onChange={(e) => setAddTimeInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addManualTime()}
+                  className="flex-1 w-[100px] min-w-[100px] bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-primary focus:outline-none"
+                />
+                <span className="text-xs text-slate-500">min</span>
+                <button
+                  type="button"
+                  onClick={addManualTime}
+                  disabled={!parseAddTimeInput(addTimeInput)}
+                  className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+
               {completedEntries.length > 0 && (
                 <div className="w-full pt-6 border-t border-slate-100 dark:border-slate-800 mt-2">
                   <div className="flex justify-between items-center text-xs mb-3">
@@ -389,10 +493,18 @@ export default function TaskDetailPage() {
                     {completedEntries.map((entry) => (
                       <div
                         key={entry.id}
-                        className="flex justify-between text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg"
+                        className="flex justify-between items-center gap-2 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg"
                       >
-                        <span>{new Date(entry.startAt).toLocaleString()}</span>
-                        <span className="font-mono">{formatTime(entry.seconds)}</span>
+                        <span className="flex-1 min-w-0 truncate">{new Date(entry.startAt).toLocaleString()}</span>
+                        <span className="font-mono shrink-0">{formatTime(entry.seconds)}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeSession(entry)}
+                          className="shrink-0 p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          title="Remove session"
+                        >
+                          <span className="material-symbols-outlined text-base">close</span>
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -410,7 +522,7 @@ export default function TaskDetailPage() {
               <div className="bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center px-4 h-12 border border-transparent focus-within:border-primary transition-all">
                 <span className="material-symbols-outlined text-slate-400 text-sm">timer</span>
                 <input
-                  className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none"
+                  className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none pl-2.5"
                   type="number"
                   value={task.estimateMinutes ?? ""}
                   onChange={(e) => update({ estimateMinutes: Number(e.target.value) || undefined })}
@@ -454,7 +566,7 @@ export default function TaskDetailPage() {
               <div className="bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center px-4 h-12 border border-transparent focus-within:border-primary transition-all">
                 <span className="material-symbols-outlined text-gradient text-sm">payments</span>
                 <input
-                  className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none"
+                  className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none pl-2.5"
                   type="number"
                   value={task.moneyImpact ?? ""}
                   onChange={(e) => update({ moneyImpact: Number(e.target.value) || undefined })}
