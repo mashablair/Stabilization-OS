@@ -148,7 +148,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 md:px-12 pb-24 md:pb-8">
+    <div className="max-w-7xl mx-auto px-6 py-8 nav:px-12 pb-24 md:pb-8">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
           <h2 className="text-3xl font-black tracking-tight">

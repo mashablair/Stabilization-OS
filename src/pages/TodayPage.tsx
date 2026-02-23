@@ -260,7 +260,7 @@ export default function TodayPage() {
   };
 
   return (
-    <div className="flex flex-1 justify-center py-8 px-4 md:px-0 pb-24 md:pb-8">
+    <div className="flex flex-1 justify-center py-8 px-4 nav:px-0 pb-24 md:pb-8">
       <div className="flex flex-col max-w-[800px] flex-1 gap-8">
         {/* Tab Selector */}
         <section className="flex flex-col gap-5 text-center">

@@ -32,37 +32,38 @@ export default function Layout() {
   return (
     <div className={isDark ? "dark" : ""}>
       <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
-        <header className="flex items-center justify-between border-b border-slate-200 dark:border-border-dark px-6 md:px-10 py-3 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md sticky top-0 z-50">
-          <NavLink to="/" className="flex items-center gap-3">
-            <div className="size-7">{logoSvg}</div>
-            <h1 className="text-lg font-bold tracking-tight">
-              Stabilization OS
-            </h1>
-          </NavLink>
+        <div className="sticky top-0 z-50">
+          <header className="flex items-center justify-between border-b border-slate-200 dark:border-border-dark px-6 nav:px-10 py-3 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md">
+            <NavLink to="/" className="flex items-center gap-3">
+              <div className="size-7">{logoSvg}</div>
+              <h1 className="text-lg font-bold tracking-tight">
+                Stabilization OS
+              </h1>
+            </NavLink>
 
-          <nav className="hidden md:flex items-center gap-6">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/"}
-                className={({ isActive }) =>
-                  `text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                    isActive
-                      ? "text-primary font-semibold"
-                      : "text-slate-500 dark:text-slate-400 hover:text-primary"
-                  }`
-                }
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  {item.icon}
-                </span>
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
+            <nav className="hidden nav:flex items-center gap-6">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/"}
+                  className={({ isActive }) =>
+                    `text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                      isActive
+                        ? "text-primary font-semibold"
+                        : "text-slate-500 dark:text-slate-400 hover:text-primary"
+                    }`
+                  }
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
 
-          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
             <NavLink
               to="/settings"
               className={({ isActive }) =>
@@ -92,11 +93,35 @@ export default function Layout() {
           </div>
         </header>
 
+        {/* Second-row nav: 768px–999px (between mobile bottom nav and desktop inline nav) */}
+        <nav className="hidden md:flex nav:hidden items-center gap-6 px-6 py-2 border-b border-slate-200 dark:border-border-dark bg-white/80 dark:bg-background-dark/80 backdrop-blur-md">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/"}
+              className={({ isActive }) =>
+                `text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                  isActive
+                    ? "text-primary font-semibold"
+                    : "text-slate-500 dark:text-slate-400 hover:text-primary"
+                }`
+              }
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {item.icon}
+              </span>
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+        </div>
+
         <main className="flex-1">
           <Outlet />
         </main>
 
-        {/* Mobile bottom nav */}
+        {/* Mobile bottom nav (below 768px only) */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-slate-200 dark:border-border-dark flex justify-around py-2 z-50">
           {navItems.map((item) => (
             <NavLink

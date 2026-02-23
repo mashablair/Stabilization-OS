@@ -3,6 +3,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
+  /* Nav switches from mobile to desktop at 1000px */
+  --breakpoint-nav: 62.5rem; /* 1000px */
   --color-primary: #a855f7;
   --color-accent-pink: #ec4899;
   --color-accent-start: #9333ea;
