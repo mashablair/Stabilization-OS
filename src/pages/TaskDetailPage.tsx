@@ -205,7 +205,7 @@ export default function TaskDetailPage() {
                     setEditingTitle(task.title);
                     setIsEditingTitle(true);
                   }}
-                  className="text-3xl lg:text-4xl font-black tracking-tight p-0 w-full text-left hover:opacity-80 transition-opacity min-h-[1.5em]"
+                  className="text-3xl lg:text-4xl font-semibold tracking-tight p-0 w-full text-left hover:opacity-80 transition-opacity min-h-[1.5em]"
                 >
                   {task.title || <span className="text-slate-400 font-normal">Untitled task — click to rename</span>}
                 </button>
