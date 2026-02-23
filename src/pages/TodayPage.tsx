@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, buildStabilizerStack, getWaitingTasks, isActionable, nowISO } from "../db";
+import { db, buildStabilizerStackSplit, getWaitingTasks, isActionable, nowISO } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
 import QuickEntryModal from "../components/QuickEntryModal";
+import AllTasksDrawer from "../components/AllTasksDrawer";
 
 type Tab = "Stabilizer" | "Builder";
 
@@ -29,16 +30,18 @@ export default function TodayPage() {
   const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
   const allTasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
   const [showModal, setShowModal] = useState(false);
+  const [showAllTasksDrawer, setShowAllTasksDrawer] = useState(false);
   const [tab, setTab] = useState<Tab>("Stabilizer");
   const [waitingOpen, setWaitingOpen] = useState(false);
   const timer = useTimer();
 
   const availMins = settings?.availableMinutes ?? 120;
 
-  const stabilizerTasks = useMemo(
-    () => buildStabilizerStack(allTasks, categories, availMins),
+  const { pinned: stabilizerPinned, suggested: stabilizerSuggested } = useMemo(
+    () => buildStabilizerStackSplit(allTasks, categories, availMins, 5),
     [allTasks, categories, availMins]
   );
+  const stabilizerTasks = [...stabilizerPinned, ...stabilizerSuggested];
 
   const builderActionable = useMemo(
     () =>
@@ -69,6 +72,145 @@ export default function TodayPage() {
       pendingReason: undefined,
       updatedAt: nowISO(),
     });
+  };
+
+  const pinToToday = async (taskId: string) => {
+    await db.tasks.update(taskId, { status: "TODAY", updatedAt: nowISO() });
+  };
+  const removeFromToday = async (taskId: string) => {
+    await db.tasks.update(taskId, { status: "BACKLOG", updatedAt: nowISO() });
+  };
+
+  const stackCount = tab === "Stabilizer" ? stabilizerTasks.length : builderActionable.length;
+  const stackFull = tab === "Stabilizer" && stabilizerPinned.length >= 5;
+
+  const renderTaskCard = (
+    task: (typeof allTasks)[0],
+    isPinned: boolean,
+    showPinActions = true
+  ) => {
+    const cat = catMap.get(task.categoryId);
+    const isActive = timer.activeTaskId === task.id;
+    const isRunning = isActive && timer.isRunning;
+    const canPin = !stackFull && !isPinned;
+
+    return (
+      <div
+        key={task.id}
+        className={`p-6 rounded-2xl transition-all ${
+          isActive
+            ? "bg-white dark:bg-card-dark border-2 border-primary/40 shadow-[0_0_20px_rgba(168,85,247,0.15)] ring-4 ring-primary/5"
+            : "bg-white/60 dark:bg-card-dark/50 border border-slate-200 dark:border-border-dark opacity-80 hover:opacity-100"
+        }`}
+      >
+        <div className="flex justify-between items-start mb-3">
+          <span
+            className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${
+              isActive
+                ? "bg-primary/10 text-primary border border-primary/20"
+                : "bg-slate-200 dark:bg-border-dark text-slate-500 dark:text-slate-400"
+            }`}
+          >
+            {cat?.name ?? "—"}
+          </span>
+          <div className="flex items-center gap-2">
+            {showPinActions && isPinned && (
+              <button
+                onClick={() => removeFromToday(task.id)}
+                className="text-xs text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-1"
+                title="Remove from today"
+              >
+                <span className="material-symbols-outlined text-sm">push_pin</span>
+              </button>
+            )}
+            {showPinActions && !isPinned && canPin && (
+              <button
+                onClick={() => pinToToday(task.id)}
+                className="text-xs text-slate-400 hover:text-primary flex items-center gap-1"
+                title="Pin to today"
+              >
+                <span className="material-symbols-outlined text-sm">add_circle</span>
+              </button>
+            )}
+            {isActive ? (
+              <span className="text-gradient font-mono font-bold text-lg">
+                {formatTime(timer.elapsed)}
+                {task.estimateMinutes ? ` / ${formatTime(task.estimateMinutes * 60)}` : ""}
+              </span>
+            ) : (
+              <span className="text-slate-400 font-mono text-sm">
+                {task.estimateMinutes ? formatMinutes(task.estimateMinutes) : "—"}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <Link to={`/tasks/${task.id}`}>
+          <h4
+            className={`${isActive ? "text-xl font-bold" : "text-lg font-semibold"} mb-1 hover:text-primary transition-colors`}
+          >
+            {task.title}
+          </h4>
+        </Link>
+
+        {task.contextCard.reframe && (
+          <p className="text-slate-500 dark:text-slate-400 text-sm italic mb-4">
+            "{task.contextCard.reframe}"
+          </p>
+        )}
+
+        {task.subtasks.length > 0 && (
+          <div className="mb-4 flex items-center gap-2 text-xs text-slate-400">
+            <span className="material-symbols-outlined text-sm">checklist</span>
+            {task.subtasks.filter((s) => s.done).length}/{task.subtasks.length} subtasks
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          {isRunning ? (
+            <>
+              <button
+                onClick={() => timer.pauseTimer()}
+                className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+              >
+                <span className="material-symbols-outlined">pause</span>
+                Pause
+              </button>
+              <button
+                onClick={() => timer.stopTimer()}
+                className="size-12 flex items-center justify-center border-2 border-slate-200 dark:border-border-dark rounded-xl text-slate-400 hover:text-red-500 hover:border-red-500/50 transition-all"
+              >
+                <span className="material-symbols-outlined">stop</span>
+              </button>
+            </>
+          ) : isActive && timer.isPaused ? (
+            <>
+              <button
+                onClick={() => timer.startTimer(task.id)}
+                className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+              >
+                <span className="material-symbols-outlined">play_arrow</span>
+                Resume
+              </button>
+              <button
+                onClick={() => timer.stopTimer()}
+                className="size-12 flex items-center justify-center border-2 border-slate-200 dark:border-border-dark rounded-xl text-slate-400 hover:text-red-500 hover:border-red-500/50 transition-all"
+              >
+                <span className="material-symbols-outlined">stop</span>
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => timer.startTimer(task.id)}
+              className="flex-1 border-2 border-primary text-primary hover:bg-gradient-accent hover:text-white hover:border-transparent font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-all"
+            >
+              <span className="material-symbols-outlined">play_arrow</span>
+              Start
+            </button>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -147,18 +289,39 @@ export default function TodayPage() {
 
         {/* Today Stack */}
         <section className="flex flex-col gap-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold leading-tight flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">layers</span>
-              {tab === "Stabilizer" ? "Today Stack" : "Builder Queue"}
-            </h3>
-            <button
-              onClick={() => setShowModal(true)}
-              className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
-            >
-              <span className="material-symbols-outlined text-sm">add_circle</span>
-              Add Task
-            </button>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold leading-tight flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">layers</span>
+                {tab === "Stabilizer" ? "Today Stack" : "Builder Queue"}
+                {tab === "Stabilizer" && (
+                  <span className="text-slate-400 font-normal text-base">
+                    ({stackCount}/5)
+                  </span>
+                )}
+              </h3>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowAllTasksDrawer(true)}
+                  className="text-slate-600 dark:text-slate-400 text-sm font-semibold flex items-center gap-1 hover:text-primary transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm">list</span>
+                  View all tasks
+                </button>
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
+                >
+                  <span className="material-symbols-outlined text-sm">add_circle</span>
+                  Add Task
+                </button>
+              </div>
+            </div>
+            {tab === "Stabilizer" && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Up to 5 tasks. Pin tasks from All tasks to customize your stack.
+              </p>
+            )}
           </div>
 
           {/* Builder empty state */}
@@ -181,120 +344,69 @@ export default function TodayPage() {
             </div>
           )}
 
+          {/* Stack full message (Stabilizer) */}
+          {stackFull && (
+            <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+              Stack full (5/5). Remove a task from today to add another, or use{" "}
+              <button
+                onClick={() => setShowAllTasksDrawer(true)}
+                className="font-bold underline hover:no-underline"
+              >
+                View all tasks
+              </button>{" "}
+              to swap.
+            </div>
+          )}
+
           {/* Stabilizer empty state */}
           {tab === "Stabilizer" && stabilizerTasks.length === 0 && (
             <div className="text-center py-12 text-slate-400">
               <span className="material-symbols-outlined text-4xl mb-2 block">check_circle</span>
               <p className="font-medium">All clear.</p>
               <p className="text-sm mt-1">No life-admin tasks need attention right now.</p>
+              <p className="text-sm mt-2">
+                <button
+                  onClick={() => setShowAllTasksDrawer(true)}
+                  className="text-primary font-semibold hover:underline"
+                >
+                  View all tasks
+                </button>{" "}
+                to pin tasks for today.
+              </p>
             </div>
           )}
 
           {/* Task cards */}
-          <div className="flex flex-col gap-4">
-            {todayTasks.map((task) => {
-              const cat = catMap.get(task.categoryId);
-              const isActive = timer.activeTaskId === task.id;
-              const isRunning = isActive && timer.isRunning;
-
-              return (
-                <div
-                  key={task.id}
-                  className={`p-6 rounded-2xl transition-all ${
-                    isActive
-                      ? "bg-white dark:bg-card-dark border-2 border-primary/40 shadow-[0_0_20px_rgba(168,85,247,0.15)] ring-4 ring-primary/5"
-                      : "bg-white/60 dark:bg-card-dark/50 border border-slate-200 dark:border-border-dark opacity-80 hover:opacity-100"
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <span
-                      className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${
-                        isActive
-                          ? "bg-primary/10 text-primary border border-primary/20"
-                          : "bg-slate-200 dark:bg-border-dark text-slate-500 dark:text-slate-400"
-                      }`}
-                    >
-                      {cat?.name ?? "—"}
-                    </span>
-                    {isActive ? (
-                      <span className="text-gradient font-mono font-bold text-lg">
-                        {formatTime(timer.elapsed)}
-                        {task.estimateMinutes ? ` / ${formatTime(task.estimateMinutes * 60)}` : ""}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 font-mono text-sm">
-                        {task.estimateMinutes ? formatMinutes(task.estimateMinutes) : "—"}
-                      </span>
-                    )}
-                  </div>
-
-                  <Link to={`/tasks/${task.id}`}>
-                    <h4
-                      className={`${isActive ? "text-xl font-bold" : "text-lg font-semibold"} mb-1 hover:text-primary transition-colors`}
-                    >
-                      {task.title}
-                    </h4>
-                  </Link>
-
-                  {task.contextCard.reframe && (
-                    <p className="text-slate-500 dark:text-slate-400 text-sm italic mb-4">
-                      "{task.contextCard.reframe}"
-                    </p>
-                  )}
-
-                  {task.subtasks.length > 0 && (
-                    <div className="mb-4 flex items-center gap-2 text-xs text-slate-400">
-                      <span className="material-symbols-outlined text-sm">checklist</span>
-                      {task.subtasks.filter((s) => s.done).length}/{task.subtasks.length} subtasks
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-3">
-                    {isRunning ? (
-                      <>
-                        <button
-                          onClick={() => timer.pauseTimer()}
-                          className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
-                        >
-                          <span className="material-symbols-outlined">pause</span>
-                          Pause
-                        </button>
-                        <button
-                          onClick={() => timer.stopTimer()}
-                          className="size-12 flex items-center justify-center border-2 border-slate-200 dark:border-border-dark rounded-xl text-slate-400 hover:text-red-500 hover:border-red-500/50 transition-all"
-                        >
-                          <span className="material-symbols-outlined">stop</span>
-                        </button>
-                      </>
-                    ) : isActive && timer.isPaused ? (
-                      <>
-                        <button
-                          onClick={() => timer.startTimer(task.id)}
-                          className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
-                        >
-                          <span className="material-symbols-outlined">play_arrow</span>
-                          Resume
-                        </button>
-                        <button
-                          onClick={() => timer.stopTimer()}
-                          className="size-12 flex items-center justify-center border-2 border-slate-200 dark:border-border-dark rounded-xl text-slate-400 hover:text-red-500 hover:border-red-500/50 transition-all"
-                        >
-                          <span className="material-symbols-outlined">stop</span>
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => timer.startTimer(task.id)}
-                        className="flex-1 border-2 border-primary text-primary hover:bg-gradient-accent hover:text-white hover:border-transparent font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-all"
-                      >
-                        <span className="material-symbols-outlined">play_arrow</span>
-                        Start
-                      </button>
-                    )}
-                  </div>
+          <div className="flex flex-col gap-6">
+            {tab === "Stabilizer" && stabilizerPinned.length > 0 && (
+              <div className="flex flex-col gap-3">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm">push_pin</span>
+                  Pinned
+                </h4>
+                <div className="flex flex-col gap-4">
+                  {stabilizerPinned.map((task) => renderTaskCard(task, true))}
                 </div>
-              );
-            })}
+              </div>
+            )}
+            {tab === "Stabilizer" && stabilizerSuggested.length > 0 && (
+              <div className="flex flex-col gap-3">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                  Suggested
+                </h4>
+                <div className="flex flex-col gap-4">
+                  {stabilizerSuggested.map((task) => renderTaskCard(task, false))}
+                </div>
+              </div>
+            )}
+            {tab === "Builder" && (
+              <div className="flex flex-col gap-4">
+                {builderActionable.map((task) =>
+                  renderTaskCard(task, task.status === "TODAY", false)
+                )}
+              </div>
+            )}
           </div>
         </section>
 
@@ -381,6 +493,12 @@ export default function TodayPage() {
         onClose={() => setShowModal(false)}
         defaultDomain={tab === "Builder" ? "BUSINESS" : "LIFE_ADMIN"}
         addToTodayStack={tab === "Stabilizer"}
+      />
+
+      <AllTasksDrawer
+        open={showAllTasksDrawer}
+        onClose={() => setShowAllTasksDrawer(false)}
+        tab={tab}
       />
     </div>
   );

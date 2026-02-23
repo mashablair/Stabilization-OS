@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   scoreTask,
   buildStabilizerStack,
+  buildStabilizerStackSplit,
   isWaiting,
   isActionable,
   getWaitingTasks,
@@ -339,6 +340,41 @@ describe("Make actionable now", () => {
     const stack = buildStabilizerStack([task], categories, 120);
     expect(stack).toHaveLength(1);
     expect(stack[0].title).toBe("Was waiting");
+  });
+});
+
+describe("buildStabilizerStackSplit", () => {
+  it("pinned tasks (TODAY status) appear first, suggested fill remaining slots", () => {
+    const pinned = makeTask({
+      title: "User pinned this",
+      status: "TODAY",
+      categoryId: "cat-care",
+      estimateMinutes: 10,
+    });
+    const backlog = makeTask({
+      title: "Algorithm suggests",
+      status: "BACKLOG",
+      categoryId: "cat-legal",
+      estimateMinutes: 10,
+    });
+    const { pinned: outPinned, suggested: outSuggested } = buildStabilizerStackSplit(
+      [pinned, backlog],
+      categories,
+      120,
+      5
+    );
+    expect(outPinned).toHaveLength(1);
+    expect(outPinned[0].title).toBe("User pinned this");
+    expect(outSuggested).toHaveLength(1);
+    expect(outSuggested[0].title).toBe("Algorithm suggests");
+  });
+
+  it("buildStabilizerStack returns pinned then suggested", () => {
+    const pinned = makeTask({ status: "TODAY", title: "A" });
+    const suggested = makeTask({ status: "BACKLOG", title: "B" });
+    const stack = buildStabilizerStack([pinned, suggested], categories, 120);
+    expect(stack[0].title).toBe("A");
+    expect(stack[1].title).toBe("B");
   });
 });
 

@@ -179,12 +179,13 @@ export function scoreTask(
   return score;
 }
 
-export function buildStabilizerStack(
+/** Pinned = user chose TODAY; Suggested = algorithm fills remaining slots */
+export function buildStabilizerStackSplit(
   tasks: Task[],
   categories: Category[],
   availableMinutes: number,
   maxTasks = 5
-): Task[] {
+): { pinned: Task[]; suggested: Task[] } {
   const catMap = new Map(categories.map((c) => [c.id, c]));
   const pool = tasks.filter(
     (t) => t.domain === "LIFE_ADMIN" && isActionable(t)
@@ -198,25 +199,55 @@ export function buildStabilizerStack(
     .filter((s) => s.score >= 0)
     .sort((a, b) => b.score - a.score);
 
-  const result: Task[] = [];
-  const kindCount: Record<string, number> = {};
-  let usedMinutes = 0;
+  const fillFromScored = (
+    scoredList: { task: Task; score: number }[],
+    cap: number,
+    minsLeft: number,
+    excludeIds: Set<string>
+  ): Task[] => {
+    const result: Task[] = [];
+    const kindCount: Record<string, number> = {};
+    let usedMinutes = 0;
+    for (const { task } of scoredList) {
+      if (result.length >= cap || excludeIds.has(task.id)) continue;
+      const est = task.estimateMinutes ?? 15;
+      if (usedMinutes + est > minsLeft && usedMinutes > 0) continue;
+      const kind = catMap.get(task.categoryId)?.kind ?? "";
+      if ((kindCount[kind] ?? 0) >= 2 && scoredList.length > cap) continue;
+      result.push(task);
+      usedMinutes += est;
+      kindCount[kind] = (kindCount[kind] ?? 0) + 1;
+    }
+    return result;
+  };
 
-  for (const { task } of scored) {
-    if (result.length >= maxTasks) break;
+  const pinnedScored = scored.filter((s) => s.task.status === "TODAY");
+  const pinned = fillFromScored(pinnedScored, maxTasks, Infinity, new Set());
+  const pinnedIds = new Set(pinned.map((t) => t.id));
+  const pinnedMins = pinned.reduce((s, t) => s + (t.estimateMinutes ?? 15), 0);
+  const suggested = fillFromScored(
+    scored,
+    maxTasks - pinned.length,
+    Math.max(0, availableMinutes - pinnedMins),
+    pinnedIds
+  );
 
-    const est = task.estimateMinutes ?? 15;
-    if (usedMinutes + est > availableMinutes && usedMinutes > 0) continue;
+  return { pinned, suggested };
+}
 
-    const kind = catMap.get(task.categoryId)?.kind ?? "";
-    if ((kindCount[kind] ?? 0) >= 2 && scored.length > maxTasks) continue;
-
-    result.push(task);
-    usedMinutes += est;
-    kindCount[kind] = (kindCount[kind] ?? 0) + 1;
-  }
-
-  return result;
+export function buildStabilizerStack(
+  tasks: Task[],
+  categories: Category[],
+  availableMinutes: number,
+  maxTasks = 5
+): Task[] {
+  const { pinned, suggested } = buildStabilizerStackSplit(
+    tasks,
+    categories,
+    availableMinutes,
+    maxTasks
+  );
+  return [...pinned, ...suggested];
 }
 
 export function getWaitingTasks(tasks: Task[], domain: TaskDomain): Task[] {
