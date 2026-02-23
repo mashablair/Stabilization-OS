@@ -446,6 +446,44 @@ describe("buildStabilizerStackSplit", () => {
     expect(outPinned).toHaveLength(1);
     expect(outPinned[0].title).toBe("Blocked but pinned");
   });
+
+  it("suggested tasks respect remaining capacity (capacity minus time spent today)", () => {
+    const pinned = makeTask({
+      status: "TODAY",
+      title: "Pinned",
+      estimateMinutes: 50,
+      categoryId: "cat-care",
+    });
+    const backlogA = makeTask({
+      status: "BACKLOG",
+      title: "Suggested A",
+      estimateMinutes: 30,
+      categoryId: "cat-legal",
+    });
+    const backlogB = makeTask({
+      status: "BACKLOG",
+      title: "Suggested B",
+      estimateMinutes: 30,
+      categoryId: "cat-money",
+    });
+    const backlogC = makeTask({
+      status: "BACKLOG",
+      title: "Suggested C",
+      estimateMinutes: 30,
+      categoryId: "cat-maint",
+    });
+    const tasks = [pinned, backlogA, backlogB, backlogC];
+    const { pinned: outPinned, suggested: outSuggested } = buildStabilizerStackSplit(
+      tasks,
+      categories,
+      60,
+      5
+    );
+    expect(outPinned).toHaveLength(1);
+    const minsLeft = 60 - 50;
+    const suggestedTotal = outSuggested.reduce((s, t) => s + (t.estimateMinutes ?? 0), 0);
+    expect(suggestedTotal).toBeLessThanOrEqual(minsLeft);
+  });
 });
 
 describe("scoreTask excludes waiting PENDING tasks", () => {
