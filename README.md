@@ -41,6 +41,14 @@ On first run, the app automatically creates 4 categories (LEGAL, MONEY, MAINTENA
 
 Tasks flow through these statuses: **BACKLOG** → **TODAY** → **IN_PROGRESS** → **DONE** → **ARCHIVED**. Tasks can also be set to **PENDING** (waiting) with an optional future action date. Completing all subtasks on a task automatically marks it as DONE. Undoing a completion always returns the task to BACKLOG.
 
+## Testing
+
+```bash
+npm test
+```
+
+Tests use Vitest. `todayStack.test.ts` covers pure logic (scoring, stack building, actionable/waiting states, ARCHIVED behaviour). `taskLifecycle.test.ts` covers DB operations (`markTaskDone`, `markTaskArchived`, `unmarkTaskDone`) using `fake-indexeddb` for IndexedDB emulation in Node.
+
 ## Tech Stack
 
 - Vite + React + TypeScript
@@ -48,6 +56,7 @@ Tasks flow through these statuses: **BACKLOG** → **TODAY** → **IN_PROGRESS**
 - Dexie.js (IndexedDB)
 - Recharts (charts)
 - React Router v7
+- Vitest (testing)
 
 ## Environment Variables
 

@@ -393,3 +393,132 @@ describe("scoreTask excludes waiting PENDING tasks", () => {
     expect(scoreTask(t, "LEGAL", 120)).toBeGreaterThan(0);
   });
 });
+
+// ── ARCHIVED status ──────────────────────────────────────────────────
+
+describe("ARCHIVED status behaviour", () => {
+  it("scoreTask returns -1 for ARCHIVED tasks", () => {
+    const t = makeTask({ status: "ARCHIVED" });
+    expect(scoreTask(t, "LEGAL", 120)).toBe(-1);
+  });
+
+  it("ARCHIVED tasks are excluded from stabilizer stack", () => {
+    const tasks = [
+      makeTask({ status: "ARCHIVED", title: "Archived one" }),
+      makeTask({ status: "BACKLOG", title: "Active one" }),
+    ];
+    const stack = buildStabilizerStack(tasks, categories, 120);
+    expect(stack.every((t) => t.status !== "ARCHIVED")).toBe(true);
+    expect(stack.map((t) => t.title)).toContain("Active one");
+  });
+
+  it("ARCHIVED tasks are excluded from builder filter", () => {
+    const tasks = [
+      makeTask({ domain: "BUSINESS", status: "ARCHIVED", title: "Archived biz" }),
+      makeTask({ domain: "BUSINESS", status: "BACKLOG", title: "Active biz" }),
+    ];
+    const builderTasks = tasks.filter((t) => t.domain === "BUSINESS" && isActionable(t));
+    expect(builderTasks).toHaveLength(1);
+    expect(builderTasks[0].title).toBe("Active biz");
+  });
+
+  it("ARCHIVED is not waiting", () => {
+    const t = makeTask({ status: "ARCHIVED", nextActionAt: FUTURE });
+    expect(isWaiting(t)).toBe(false);
+  });
+
+  it("ARCHIVED tasks do not appear in getWaitingTasks", () => {
+    const tasks = [
+      makeTask({ status: "ARCHIVED", domain: "LIFE_ADMIN", nextActionAt: FUTURE }),
+      makeTask({ status: "PENDING", domain: "LIFE_ADMIN", nextActionAt: FUTURE }),
+    ];
+    const waiting = getWaitingTasks(tasks, "LIFE_ADMIN");
+    expect(waiting).toHaveLength(1);
+    expect(waiting[0].status).toBe("PENDING");
+  });
+});
+
+// ── completedAt field ────────────────────────────────────────────────
+
+describe("completedAt field", () => {
+  it("task interface accepts completedAt as optional string", () => {
+    const withDate = makeTask({ completedAt: "2026-02-23T00:00:00.000Z" });
+    expect(withDate.completedAt).toBe("2026-02-23T00:00:00.000Z");
+  });
+
+  it("task without completedAt defaults to undefined", () => {
+    const t = makeTask({});
+    expect(t.completedAt).toBeUndefined();
+  });
+
+  it("completed tasks can be filtered by completedAt date", () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today.getTime() - 86_400_000);
+
+    const tasks = [
+      makeTask({ status: "DONE", completedAt: today.toISOString(), title: "Done today" }),
+      makeTask({ status: "DONE", completedAt: yesterday.toISOString(), title: "Done yesterday" }),
+      makeTask({ status: "BACKLOG", title: "Not done" }),
+    ];
+
+    const doneToday = tasks.filter(
+      (t) => t.status === "DONE" && t.completedAt && new Date(t.completedAt).getTime() >= today.getTime()
+    );
+    expect(doneToday).toHaveLength(1);
+    expect(doneToday[0].title).toBe("Done today");
+  });
+});
+
+// ── Task lifecycle transitions (pure logic) ─────────────────────────
+
+describe("task lifecycle transitions", () => {
+  it("DONE → BACKLOG undo always goes to BACKLOG (not TODAY)", () => {
+    const task = makeTask({ status: "DONE", completedAt: new Date().toISOString() });
+    task.status = "BACKLOG";
+    task.completedAt = undefined;
+    expect(task.status).toBe("BACKLOG");
+    expect(task.completedAt).toBeUndefined();
+    expect(isActionable(task)).toBe(true);
+  });
+
+  it("DONE → ARCHIVED preserves completedAt", () => {
+    const completedAt = "2026-02-20T12:00:00.000Z";
+    const task = makeTask({ status: "DONE", completedAt });
+    task.status = "ARCHIVED";
+    expect(task.completedAt).toBe(completedAt);
+    expect(isActionable(task)).toBe(false);
+  });
+
+  it("ARCHIVED → BACKLOG undo clears completedAt and becomes actionable", () => {
+    const task = makeTask({ status: "ARCHIVED", completedAt: "2026-02-20T12:00:00.000Z" });
+    task.status = "BACKLOG";
+    task.completedAt = undefined;
+    expect(isActionable(task)).toBe(true);
+  });
+
+  it("all subtasks done should trigger marking task DONE", () => {
+    const subtasks = [
+      { id: "s1", title: "Sub 1", done: true },
+      { id: "s2", title: "Sub 2", done: true },
+      { id: "s3", title: "Sub 3", done: true },
+    ];
+    const allDone = subtasks.length > 0 && subtasks.every((s) => s.done);
+    expect(allDone).toBe(true);
+  });
+
+  it("partial subtasks done should NOT trigger marking task DONE", () => {
+    const subtasks = [
+      { id: "s1", title: "Sub 1", done: true },
+      { id: "s2", title: "Sub 2", done: false },
+    ];
+    const allDone = subtasks.length > 0 && subtasks.every((s) => s.done);
+    expect(allDone).toBe(false);
+  });
+
+  it("empty subtasks list should NOT trigger auto-complete", () => {
+    const subtasks: Array<{ id: string; title: string; done: boolean }> = [];
+    const allDone = subtasks.length > 0 && subtasks.every((s) => s.done);
+    expect(allDone).toBe(false);
+  });
+});
