@@ -633,7 +633,7 @@ describe("task lifecycle transitions", () => {
 describe("getEffectiveMinutes", () => {
   const baseSettings: AppSettings = {
     id: "default",
-    role: "Stabilizer",
+    role: "Life",
     availableMinutes: 120,
     builderAvailableMinutes: 90,
     darkMode: false,

@@ -727,7 +727,7 @@ export async function seedDatabase() {
 
   await db.appSettings.put({
     id: "default",
-    role: "Stabilizer",
+    role: "Life",
     availableMinutes: 120,
     builderAvailableMinutes: 120,
     darkMode: false,

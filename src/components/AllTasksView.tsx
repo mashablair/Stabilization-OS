@@ -4,7 +4,7 @@ import { db, buildStabilizerStackSplit, isActionable, nowISO, getEffectiveMinute
 import { formatMinutes } from "../hooks/useTimer";
 import type { Task } from "../db";
 
-type Tab = "Stabilizer" | "Builder";
+type Tab = "Life" | "Builder";
 
 interface Props {
   tab: Tab;
@@ -40,7 +40,7 @@ export default function AllTasksView({ tab, embedded = false, onClose }: Props) 
   const pinnedIds = new Set(pinnedTasks.map((t) => t.id));
 
   const tasks =
-    tab === "Stabilizer"
+    tab === "Life"
       ? [...stabilizerPool].sort((a, b) => {
           const aPinned = a.status === "TODAY" ? 1 : 0;
           const bPinned = b.status === "TODAY" ? 1 : 0;
@@ -76,7 +76,7 @@ export default function AllTasksView({ tab, embedded = false, onClose }: Props) 
     <div className={`flex flex-col ${embedded ? "gap-4" : "gap-6"}`}>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold leading-tight">
-          All {tab === "Stabilizer" ? "Life Admin" : "Business"} Tasks
+          All {tab === "Life" ? "Life" : "Business"} Tasks
         </h2>
         {embedded && onClose && (
           <button
@@ -90,7 +90,7 @@ export default function AllTasksView({ tab, embedded = false, onClose }: Props) 
       </div>
 
       <p className="text-sm text-slate-500 dark:text-slate-400">
-        {tab === "Stabilizer"
+        {tab === "Life"
           ? "Pin tasks to add them to your Today Stack. Unpin to remove."
           : "Pin tasks to prioritize them at the top of your Builder Queue."}
       </p>
@@ -98,14 +98,14 @@ export default function AllTasksView({ tab, embedded = false, onClose }: Props) 
       <div className="flex flex-col gap-2">
         {tasks.length === 0 ? (
           <p className="text-slate-400 py-8 text-center">
-            No {tab === "Stabilizer" ? "life admin" : "business"} tasks yet.
+            No {tab === "Life" ? "life" : "business"} tasks yet.
           </p>
         ) : (
           tasks.map((task) => {
             const cat = catMap.get(task.categoryId);
             const pinned = isPinned(task);
             const stackFull =
-              tab === "Stabilizer" && pinnedIds.size >= 5 && !pinned;
+              tab === "Life" && pinnedIds.size >= 5 && !pinned;
 
             return (
               <div

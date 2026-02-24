@@ -38,7 +38,7 @@ export default function Layout() {
             <NavLink to="/" className="flex items-center gap-3">
               <div className="size-7">{logoSvg}</div>
               <h1 className="text-lg font-bold tracking-tight">
-                Stabilization OS
+                Balance OS
               </h1>
             </NavLink>
 

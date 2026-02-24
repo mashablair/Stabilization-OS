@@ -49,7 +49,7 @@ export default function SettingsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `stabilization-os-bundle-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `balance-os-bundle-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -161,7 +161,7 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-                Stabilizer (Life Admin)
+                Life
               </label>
               <div className="flex items-center gap-2">
                 <input

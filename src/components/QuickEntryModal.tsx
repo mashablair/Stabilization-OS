@@ -105,7 +105,7 @@ export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_A
                         : "border-slate-200 dark:border-border-dark text-slate-500 hover:border-slate-400"
                     }`}
                   >
-                    {d === "LIFE_ADMIN" ? "Life Admin" : "Business"}
+                    {d === "LIFE_ADMIN" ? "Life" : "Business"}
                   </button>
                 );})}
               </div>

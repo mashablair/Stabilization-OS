@@ -16,7 +16,7 @@ import {
 import type { Task } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
 
-type DomainTab = "Stabilizer" | "Builder";
+type DomainTab = "Life" | "Builder";
 type DoneTab = "Completed" | "Archived";
 
 function daysUntil(dateStr: string): number {
@@ -39,7 +39,7 @@ function formatNextAction(dateStr: string): string {
 export default function AllTasksPage() {
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab")?.toLowerCase();
-  const domainTab: DomainTab = tabParam === "builder" ? "Builder" : "Stabilizer";
+  const domainTab: DomainTab = tabParam === "builder" ? "Builder" : "Life";
 
   const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
   const allTasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
@@ -55,7 +55,7 @@ export default function AllTasksPage() {
   const [doneTab, setDoneTab] = useState<DoneTab>("Completed");
   const [pendingOpen, setPendingOpen] = useState(false);
 
-  const domain = domainTab === "Stabilizer" ? "LIFE_ADMIN" : "BUSINESS";
+  const domain = domainTab === "Life" ? "LIFE_ADMIN" : "BUSINESS";
   const actionableTasks = allTasks.filter(
     (t) => t.domain === domain && isActionable(t)
   );
@@ -110,7 +110,7 @@ export default function AllTasksPage() {
     });
   };
   const isPinned = (task: Task) => task.status === "TODAY";
-  const stackFull = domainTab === "Stabilizer" && pinnedIds.size >= 5;
+  const stackFull = domainTab === "Life" && pinnedIds.size >= 5;
 
   const doneTasks = doneTab === "Completed" ? completedTasks : archivedTasks;
 
@@ -128,12 +128,12 @@ export default function AllTasksPage() {
         <Link
           to="/today/all?tab=stabilizer"
           className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-            domainTab === "Stabilizer"
+            domainTab === "Life"
               ? "bg-primary/10 text-primary border border-primary"
               : "border border-slate-200 dark:border-border-dark text-slate-500 hover:border-slate-400"
           }`}
         >
-          Stabilizer
+          Life
         </Link>
         <Link
           to="/today/all?tab=builder"
@@ -151,10 +151,10 @@ export default function AllTasksPage() {
       <div className="flex flex-col gap-6">
         <div>
           <h2 className="text-xl font-bold leading-tight">
-            All {domainTab === "Stabilizer" ? "Life Admin" : "Business"} Tasks
+            All {domainTab === "Life" ? "Life" : "Business"} Tasks
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            {domainTab === "Stabilizer"
+            {domainTab === "Life"
               ? "Pin tasks to add them to your Today Stack. Unpin to remove."
               : "Pin tasks to prioritize them at the top of your Builder Queue."}
           </p>
@@ -163,7 +163,7 @@ export default function AllTasksPage() {
         <div className="flex flex-col gap-2">
           {sortedTasks.length === 0 ? (
             <p className="text-slate-400 py-8 text-center">
-              No {domainTab === "Stabilizer" ? "life admin" : "business"} tasks yet.
+              No {domainTab === "Life" ? "life" : "business"} tasks yet.
             </p>
           ) : (
             sortedTasks.map((task) => {

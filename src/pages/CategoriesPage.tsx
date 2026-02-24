@@ -33,13 +33,13 @@ export default function CategoriesPage() {
     categories: typeof allCategories;
   }) => (
     <div>
-      <h2 className="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">
+      <h2 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-1">
         {title}
       </h2>
-      <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
+      <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">
         {description}
       </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
         {categories.map((cat) => {
           const catTasks = getTasksForCategory(cat.id);
           const doneTasks = catTasks.filter((t) => t.status === "DONE" || t.status === "ARCHIVED").length;
@@ -48,56 +48,44 @@ export default function CategoriesPage() {
           return (
             <div
               key={cat.id}
-              className="group flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-8 shadow-sm hover:shadow-md hover:border-accent-pink transition-all duration-300"
+              className="group flex flex-col bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4 shadow-sm hover:shadow-md hover:border-accent-pink transition-all duration-300"
             >
-              <div className="flex justify-between items-start mb-6">
-                <div className="p-3 bg-gradient-accent rounded-lg text-white">
-                  <span className="material-symbols-outlined text-3xl">
-                    {kindIcons[cat.kind] ?? "category"}
-                  </span>
+              <div className="flex justify-between items-center gap-3 mb-3">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="p-1.5 bg-gradient-accent rounded-lg text-white shrink-0">
+                    <span className="material-symbols-outlined text-lg">
+                      {kindIcons[cat.kind] ?? "category"}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-bold tracking-tight truncate">
+                    {cat.name}
+                  </h3>
                 </div>
                 <Link
                   to={`/categories/${cat.id}`}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-accent text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-accent text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0"
                 >
-                  Enter Category
-                  <span className="material-symbols-outlined text-sm">
+                  Enter
+                  <span className="material-symbols-outlined text-xs">
                     arrow_forward
                   </span>
                 </Link>
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 tracking-tight">
-                {cat.name}
-              </h3>
-
-              <div className="space-y-6 grow">
-                <div>
-                  <span className="text-[10px] uppercase font-bold tracking-[0.15em] text-slate-400 dark:text-slate-500 block mb-1">
-                    Why this matters
-                  </span>
-                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                    {cat.contextCard.why}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold tracking-[0.15em] text-gradient block mb-1">
-                    Win condition
-                  </span>
-                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                    {cat.contextCard.winCondition}
-                  </p>
-                </div>
+              <div className="grow min-h-0">
+                <span className="text-[10px] uppercase font-bold tracking-[0.15em] text-slate-400 dark:text-slate-500 block mb-0.5">
+                  Why this matters
+                </span>
+                <p className="text-slate-600 dark:text-slate-300 text-sm leading-snug line-clamp-2">
+                  {cat.contextCard.why}
+                </p>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-3 italic text-gradient font-medium">
-                  <span className="material-symbols-outlined text-primary">
-                    auto_awesome
-                  </span>
-                  <p>{cat.contextCard.script}</p>
-                </div>
-                <span className="text-xs text-slate-400 font-mono">
+              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 min-w-0">
+                <p className="text-xs italic text-gradient font-medium truncate flex-1 min-w-0">
+                  {cat.contextCard.script}
+                </p>
+                <span className="text-xs text-slate-400 font-mono shrink-0">
                   {doneTasks}/{totalTasks}
                 </span>
               </div>
@@ -120,9 +108,9 @@ export default function CategoriesPage() {
         </p>
       </div>
 
-      <div className="flex flex-col gap-12">
+      <div className="flex flex-col gap-8">
         <CategorySection
-          title="Stabilizer (Life Admin)"
+          title="Life"
           description="Categories for keeping life running smoothly."
           categories={lifeAdminCategories}
         />
@@ -137,7 +125,7 @@ export default function CategoriesPage() {
         <div className="flex flex-col md:flex-row items-center gap-8">
           <div className="flex-1">
             <h4 className="text-xl font-bold mb-2">
-              The Stabilization Method
+              The Balance Method
             </h4>
             <p className="text-slate-600 dark:text-slate-400">
               When stress levels are high, narrow your focus. These categories

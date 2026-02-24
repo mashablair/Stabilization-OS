@@ -657,7 +657,7 @@ export default function TaskDetailPage() {
                         : "border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-400"
                     }`}
                   >
-                    {d === "LIFE_ADMIN" ? "Life Admin" : "Business"}
+                    {d === "LIFE_ADMIN" ? "Life" : "Business"}
                   </button>
                 );})}
               </div>

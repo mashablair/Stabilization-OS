@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import AllTasksView from "./AllTasksView";
 
-type Tab = "Stabilizer" | "Builder";
+type Tab = "Life" | "Builder";
 
 interface Props {
   open: boolean;

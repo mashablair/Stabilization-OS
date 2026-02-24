@@ -44,7 +44,15 @@ export default function CategoryDetailPage() {
       </div>
 
       <h1 className="text-3xl font-bold tracking-tight mb-2">{category.name}</h1>
-      <p className="text-slate-500 dark:text-slate-400 mb-8">{category.contextCard.why}</p>
+      <p className="text-slate-500 dark:text-slate-400 mb-4">{category.contextCard.why}</p>
+      <div className="mb-8 p-4 rounded-lg bg-gradient-accent/5 border border-primary/10">
+        <span className="text-[10px] uppercase font-bold tracking-[0.15em] text-gradient block mb-1">
+          Win condition
+        </span>
+        <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+          {category.contextCard.winCondition}
+        </p>
+      </div>
 
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800">

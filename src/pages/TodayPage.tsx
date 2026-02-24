@@ -7,7 +7,7 @@ import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
 import QuickEntryModal from "../components/QuickEntryModal";
 import AllTasksDrawer from "../components/AllTasksDrawer";
 import CapacityAdjustPopover from "../components/CapacityAdjustPopover";
-type Tab = "Stabilizer" | "Builder";
+type Tab = "Life" | "Builder";
 
 function daysUntil(dateStr: string): number {
   return Math.ceil(
@@ -32,7 +32,7 @@ export default function TodayPage() {
   const allTasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
   const [showModal, setShowModal] = useState(false);
   const [showAllTasksDrawer, setShowAllTasksDrawer] = useState(false);
-  const [tab, setTab] = useState<Tab>("Stabilizer");
+  const [tab, setTab] = useState<Tab>("Life");
   const [waitingOpen, setWaitingOpen] = useState(false);
   const [doneOpen, setDoneOpen] = useState(true);
   const [capacityPopoverOpen, setCapacityPopoverOpen] = useState(false);
@@ -50,10 +50,10 @@ export default function TodayPage() {
 
   const stabilizerMins = getEffectiveMinutes(settings, stabilizerDailyOverride, "LIFE_ADMIN");
   const builderMins = getEffectiveMinutes(settings, builderDailyOverride, "BUSINESS");
-  const availMins = tab === "Stabilizer" ? stabilizerMins : builderMins;
-  const currentDomain: TaskDomain = tab === "Stabilizer" ? "LIFE_ADMIN" : "BUSINESS";
-  const currentOverride = tab === "Stabilizer" ? stabilizerDailyOverride : builderDailyOverride;
-  const currentDefault = tab === "Stabilizer"
+  const availMins = tab === "Life" ? stabilizerMins : builderMins;
+  const currentDomain: TaskDomain = tab === "Life" ? "LIFE_ADMIN" : "BUSINESS";
+  const currentOverride = tab === "Life" ? stabilizerDailyOverride : builderDailyOverride;
+  const currentDefault = tab === "Life"
     ? (settings?.availableMinutes ?? 120)
     : (settings?.builderAvailableMinutes ?? 120);
   const isOverridden = !!currentOverride && currentOverride.date === today;
@@ -91,7 +91,7 @@ export default function TodayPage() {
   );
 
   const waitingTasks = useMemo(
-    () => getWaitingTasks(allTasks, tab === "Stabilizer" ? "LIFE_ADMIN" : "BUSINESS"),
+    () => getWaitingTasks(allTasks, tab === "Life" ? "LIFE_ADMIN" : "BUSINESS"),
     [allTasks, tab]
   );
 
@@ -101,10 +101,10 @@ export default function TodayPage() {
     return d.getTime();
   }, []);
 
-  const spentMins = tab === "Stabilizer" ? stabilizerSpentMins : builderSpentMins;
+  const spentMins = tab === "Life" ? stabilizerSpentMins : builderSpentMins;
 
   const doneToday = useMemo(() => {
-    const domain = tab === "Stabilizer" ? "LIFE_ADMIN" : "BUSINESS";
+    const domain = tab === "Life" ? "LIFE_ADMIN" : "BUSINESS";
     return allTasks
       .filter(
         (t) =>
@@ -119,7 +119,7 @@ export default function TodayPage() {
       );
   }, [allTasks, tab, todayStart]);
 
-  const todayTasks = tab === "Stabilizer" ? stabilizerTasks : builderActionable;
+  const todayTasks = tab === "Life" ? stabilizerTasks : builderActionable;
 
   const allocatedMins = todayTasks.reduce(
     (s, t) => s + (t.estimateMinutes ?? 0),
@@ -159,8 +159,8 @@ export default function TodayPage() {
     await db.tasks.update(taskId, { status: "BACKLOG", updatedAt: nowISO() });
   };
 
-  const stackCount = tab === "Stabilizer" ? stabilizerTasks.length : builderActionable.length;
-  const stackFull = tab === "Stabilizer" && stabilizerPinned.length >= 5;
+  const stackCount = tab === "Life" ? stabilizerTasks.length : builderActionable.length;
+  const stackFull = tab === "Life" && stabilizerPinned.length >= 5;
 
   const renderTaskCard = (
     task: (typeof allTasks)[0],
@@ -308,21 +308,21 @@ export default function TodayPage() {
         <section className="flex flex-col gap-5 text-center">
           <div className="flex items-center justify-center gap-2 text-primary">
             <span className="material-symbols-outlined text-3xl">
-              {tab === "Stabilizer" ? "shield" : "construction"}
+              {tab === "Life" ? "shield" : "construction"}
             </span>
           </div>
           <h1 className="tracking-tight text-3xl font-bold leading-tight">
-            {tab === "Stabilizer"
+            {tab === "Life"
               ? "What needs stabilizing today?"
               : "What are you building today?"}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md mx-auto">
-            {tab === "Stabilizer"
+            {tab === "Life"
               ? "Focus on the foundations. Legal and financial tasks come first."
               : "Business tasks live here. Ship when you're ready."}
           </p>
           <div className="flex p-1.5 rounded-xl bg-slate-200 dark:bg-card-dark border border-slate-300 dark:border-border-dark self-center w-full max-w-sm">
-            {(["Stabilizer", "Builder"] as const).map((t) => (
+            {(["Life", "Builder"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -340,7 +340,7 @@ export default function TodayPage() {
         </section>
 
         {/* Capacity */}
-        {(tab === "Stabilizer" || (tab === "Builder" && builderActionable.length > 0)) && (
+        {(tab === "Life" || (tab === "Builder" && builderActionable.length > 0)) && (
           <section className="flex flex-col items-center gap-4 bg-primary/5 p-6 rounded-2xl border border-primary/10 mb-[25px]">
             <div className="flex flex-col items-center gap-2">
               <h3 className="text-slate-700 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">
@@ -426,8 +426,8 @@ export default function TodayPage() {
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-bold leading-tight flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">layers</span>
-                {tab === "Stabilizer" ? "Today Stack" : "Builder Queue"}
-                {tab === "Stabilizer" && (
+                {tab === "Life" ? "Today Stack" : "Builder Queue"}
+                {tab === "Life" && (
                   <span className="hidden md:inline text-slate-400 font-normal text-base">
                     ({stackCount}/5)
                   </span>
@@ -452,7 +452,7 @@ export default function TodayPage() {
                 </button>
               </div>
             </div>
-            {tab === "Stabilizer" && (
+            {tab === "Life" && (
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Up to 5 tasks. Pin tasks from All Tasks to customize your stack.
               </p>
@@ -467,7 +467,7 @@ export default function TodayPage() {
               </div>
               <h3 className="text-xl font-bold mb-2">Builder is paused</h3>
               <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm mx-auto leading-relaxed">
-                This week is Stabilization week. Add business tasks when you're ready — they'll live here.
+                This week is Balance week. Add business tasks when you're ready — they'll live here.
               </p>
               <button
                 onClick={() => setShowModal(true)}
@@ -479,7 +479,7 @@ export default function TodayPage() {
             </div>
           )}
 
-          {/* Stack full message (Stabilizer) */}
+          {/* Stack full message (Life) */}
           {stackFull && (
             <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
               Stack full (5/5). Remove a task from today to add another, or use{" "}
@@ -493,8 +493,8 @@ export default function TodayPage() {
             </div>
           )}
 
-          {/* Stabilizer empty state */}
-          {tab === "Stabilizer" && stabilizerTasks.length === 0 && (
+          {/* Life empty state */}
+          {tab === "Life" && stabilizerTasks.length === 0 && (
             <div className="text-center py-12 text-slate-400">
               <span className="material-symbols-outlined text-4xl mb-2 block">check_circle</span>
               <p className="font-medium">All clear.</p>
@@ -513,7 +513,7 @@ export default function TodayPage() {
 
           {/* Task cards */}
           <div className="flex flex-col gap-6">
-            {tab === "Stabilizer" && stabilizerPinned.length > 0 && (
+            {tab === "Life" && stabilizerPinned.length > 0 && (
               <div className="flex flex-col gap-3">
                 <h4 className="text-xs font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 flex items-center gap-2">
                   <span className="material-symbols-outlined text-sm">push_pin</span>
@@ -524,7 +524,7 @@ export default function TodayPage() {
                 </div>
               </div>
             )}
-            {tab === "Stabilizer" && stabilizerSuggested.length > 0 && (
+            {tab === "Life" && stabilizerSuggested.length > 0 && (
               <div className="flex flex-col gap-3">
                 <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
                   <span className="material-symbols-outlined text-sm">auto_awesome</span>
@@ -699,7 +699,7 @@ export default function TodayPage() {
         open={showModal}
         onClose={() => setShowModal(false)}
         defaultDomain={tab === "Builder" ? "BUSINESS" : "LIFE_ADMIN"}
-        addToTodayStack={tab === "Stabilizer"}
+        addToTodayStack={tab === "Life"}
       />
 
       <AllTasksDrawer

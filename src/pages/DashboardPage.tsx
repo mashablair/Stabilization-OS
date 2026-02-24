@@ -15,7 +15,7 @@ import {
   Line,
 } from "recharts";
 
-type FilterTab = "All" | "Stabilizer" | "Builder";
+type FilterTab = "All" | "Life" | "Builder";
 
 export default function DashboardPage() {
   const [filterTab, setFilterTab] = useState<FilterTab>("All");
@@ -57,7 +57,7 @@ export default function DashboardPage() {
   const weekAgo = new Date(now.getTime() - 7 * 86400000);
 
   const domain: TaskDomain | null =
-    filterTab === "Stabilizer" ? "LIFE_ADMIN" : filterTab === "Builder" ? "BUSINESS" : null;
+    filterTab === "Life" ? "LIFE_ADMIN" : filterTab === "Builder" ? "BUSINESS" : null;
 
   const filteredTasks = useMemo(() => {
     if (!domain) return tasks;
@@ -216,7 +216,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex p-1.5 rounded-xl bg-slate-200 dark:bg-card-dark border border-slate-300 dark:border-border-dark w-full md:w-auto max-w-sm">
-          {(["All", "Stabilizer", "Builder"] as const).map((t) => (
+          {(["All", "Life", "Builder"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -389,7 +389,7 @@ export default function DashboardPage() {
           </span>
         </div>
         <div>
-          <h4 className="font-bold text-primary">Stabilization Insight</h4>
+          <h4 className="font-bold text-primary">Balance Insight</h4>
           <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
             You have <strong>{stats.openLoops} open loops</strong> creating
             mental drag. Focus on completing small tasks first to build momentum

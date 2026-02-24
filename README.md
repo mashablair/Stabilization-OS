@@ -1,6 +1,6 @@
-# Stabilization OS
+# Balance OS
 
-A local-first personal web app for managing life-admin tasks with categories, subtasks, encouragement context, time tracking, wins journaling, and a progress dashboard.
+A local-first personal web app for managing life tasks with categories, subtasks, encouragement context, time tracking, wins journaling, and a progress dashboard.
 
 ## How to Run
 
@@ -13,15 +13,15 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Features
 
-- **Today Stack** — Choose your daily role (Stabilizer / Builder) and focus on up to 5 tasks. Pin tasks you want; the algorithm suggests the rest. Mark tasks done with the ✓ checkmark icon next to each task. **Time Capacity** shows a three-segment bar: time spent today (green), allocated to your stack (purple), and breathing room (grey). Adjust capacity per day with the tune icon — changes apply to today only, with separate budgets for Stabilizer and Builder. The algorithm uses remaining capacity (capacity minus time spent) when suggesting tasks, so it won’t over-fill your stack after you complete longer tasks. A collapsible **Done Today** section celebrates completed tasks with motivational messages. **Log a win** to record accomplishments beyond your task list (e.g. started building this app, did a face mask).
+- **Today Stack** — Choose your daily role (Life / Builder) and focus on up to 5 tasks. Pin tasks you want; the algorithm suggests the rest. Mark tasks done with the ✓ checkmark icon next to each task. **Time Capacity** shows a three-segment bar: time spent today (green), allocated to your stack (purple), and breathing room (grey). Adjust capacity per day with the tune icon — changes apply to today only, with separate budgets for Life and Builder. The algorithm uses remaining capacity (capacity minus time spent) when suggesting tasks, so it won’t over-fill your stack after you complete longer tasks. A collapsible **Done Today** section celebrates completed tasks with motivational messages. **Log a win** to record accomplishments beyond your task list (e.g. started building this app, did a face mask).
 - **All Tasks** — Dedicated page (main nav) to browse all active tasks by domain, with a collapsible **Pending** section (tasks waiting on a future action date) and a collapsible **Done** section containing **Completed** and **Archived** tabs. Archive tasks to declutter without losing history.
-- **Categories** — Domain-specific categories. **Stabilizer (Life Admin):** LEGAL, MONEY, MAINTENANCE, CAREGIVER. **Builder (Business):** LEGAL, CONTENT, PRODUCT, NETWORKING, LEARNING, OPS. Each category has context cards (why, win condition, script).
+- **Categories** — Domain-specific categories. **Life:** LEGAL, MONEY, MAINTENANCE, CAREGIVER. **Builder (Business):** LEGAL, CONTENT, PRODUCT, NETWORKING, LEARNING, OPS. Overview cards show why each category matters; the detail page includes win condition and script.
 - **Task Detail** — Click the task name to edit it (display/edit mode prevents cursor jumping). Inline editing for other fields, subtasks with auto-completion (marking all subtasks done auto-completes the task), context cards (why / next micro-step / reframe), priority, due dates, money impact. Tasks track a `completedAt` timestamp for accurate reporting.
 - **Focus Timer** — Start/pause/stop timer per task; persisted in IndexedDB so page refresh won't lose time. **Add time** manually (minutes or `h:mm`) when you forget to start the timer; remove sessions from history via the × button. Session history and total update live.
-- **Dashboard** — Weekly stats (tasks completed, time tracked, money recovered, open loops), time allocation chart, open loops trend, friction log. Filter by **All**, **Stabilizer**, or **Builder** to view stats per domain. Chart tooltips adapt to light/dark mode for readable contrast.
+- **Dashboard** — Weekly stats (tasks completed, time tracked, money recovered, open loops), time allocation chart, open loops trend, friction log. Filter by **All**, **Life**, or **Builder** to view stats per domain. Chart tooltips adapt to light/dark mode for readable contrast.
 - **Wins** — A dedicated page to log and browse accomplishments beyond your tracked tasks. Tag wins with life, biz, vitality, or community. Browse by week, month, quarter, or year. Quick-add from the Today page footer. Revisit during quarterly reviews or when you need a boost.
 - **Weekly Review** — Guided wizard that starts with a **Wins** step highlighting completed tasks, time invested, money recovered, and **other wins** you logged this week, followed by estimate mismatches, friction reflection, category focus, and smallest next step
-- **Settings** — Configure default daily capacity for Stabilizer and Builder, export/import JSON share bundles, CSV exports (tasks + time entries), dark mode toggle, data reset. Accessible via the gear icon in the header.
+- **Settings** — Configure default daily capacity for Life and Builder, export/import JSON share bundles, CSV exports (tasks + time entries), dark mode toggle, data reset. Accessible via the gear icon in the header.
 
 ## Data Storage
 
@@ -36,7 +36,7 @@ All data is stored locally in your browser using IndexedDB (via Dexie.js) for th
 
 ## Seed Data
 
-On first run, the app automatically creates 4 Life Admin categories (LEGAL, MONEY, MAINTENANCE, CAREGIVER), 6 Builder categories (LEGAL, CONTENT, PRODUCT, NETWORKING, LEARNING, OPS), and 10 sample Life Admin tasks. To re-seed, use the **Reset All Data** option in Settings and reload the page.
+On first run, the app automatically creates 4 Life categories (LEGAL, MONEY, MAINTENANCE, CAREGIVER), 6 Builder categories (LEGAL, CONTENT, PRODUCT, NETWORKING, LEARNING, OPS), and 10 sample Life tasks. To re-seed, use the **Reset All Data** option in Settings and reload the page.
 
 ## Task Lifecycle
 

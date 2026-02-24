@@ -9,9 +9,11 @@ import WeeklyReviewPage from "./pages/WeeklyReviewPage";
 import SettingsPage from "./pages/SettingsPage";
 import AllTasksPage from "./pages/AllTasksPage";
 import WinsPage from "./pages/WinsPage";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
@@ -28,5 +30,6 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }
