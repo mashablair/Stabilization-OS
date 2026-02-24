@@ -3,7 +3,10 @@ import Dexie, { type EntityTable } from "dexie";
 export type TaskDomain = "LIFE_ADMIN" | "BUSINESS";
 export type LifeAdminCategoryKind = "LEGAL" | "MONEY" | "MAINTENANCE" | "CAREGIVER";
 export type BuilderCategoryKind = "LEGAL" | "CONTENT" | "PRODUCT" | "NETWORKING" | "LEARNING" | "OPS";
-export type CategoryKind = LifeAdminCategoryKind | BuilderCategoryKind;
+export type CategoryKind =
+  | LifeAdminCategoryKind
+  | BuilderCategoryKind
+  | "CUSTOM";
 export type TaskStatus = "BACKLOG" | "TODAY" | "IN_PROGRESS" | "PENDING" | "DONE" | "ARCHIVED";
 
 export interface Category {
@@ -73,6 +76,7 @@ export interface AppSettings {
   availableMinutes: number;
   builderAvailableMinutes: number;
   darkMode: boolean;
+  hiddenCategoryIds?: string[];
 }
 
 export interface DailyCapacity {
@@ -172,6 +176,23 @@ db.version(4).stores({
     const newCatId = t.categoryId === oldLegalId ? builderLegalId : builderOpsId;
     await tx.table("tasks").update(t.id, { categoryId: newCatId });
   }
+});
+
+db.version(5).stores({
+  categories: "id, kind, domain",
+  tasks: "id, categoryId, status, priority, domain",
+  timeEntries: "id, taskId",
+  weeklyReviews: "id, weekStart",
+  timerState: "id",
+  appSettings: "id",
+  dailyCapacity: "id, [date+domain]",
+  wins: "id, date, createdAt",
+}).upgrade(tx => {
+  return tx.table("appSettings").toCollection().modify((settings: { hiddenCategoryIds?: string[] }) => {
+    if (settings.hiddenCategoryIds === undefined) {
+      settings.hiddenCategoryIds = [];
+    }
+  });
 });
 
 export { db };
@@ -289,6 +310,7 @@ const KIND_WEIGHTS: Record<string, number> = {
   NETWORKING: 20,
   LEARNING: 15,
   OPS: 10,
+  CUSTOM: 10,
 };
 
 export function scoreTask(
@@ -408,6 +430,81 @@ export function buildStabilizerStack(
 
 export function getCategoriesByDomain(categories: Category[], domain: TaskDomain): Category[] {
   return categories.filter((c) => c.domain === domain);
+}
+
+export async function getHiddenCategoryIds(): Promise<string[]> {
+  const settings = await db.appSettings.get("default");
+  return settings?.hiddenCategoryIds ?? [];
+}
+
+export async function toggleCategoryVisibility(categoryId: string): Promise<void> {
+  const settings = await db.appSettings.get("default");
+  const hidden = settings?.hiddenCategoryIds ?? [];
+  const next = hidden.includes(categoryId)
+    ? hidden.filter((id) => id !== categoryId)
+    : [...hidden, categoryId];
+  await db.appSettings.put({
+    ...settings,
+    id: "default",
+    role: settings?.role ?? "Life",
+    availableMinutes: settings?.availableMinutes ?? 120,
+    builderAvailableMinutes: settings?.builderAvailableMinutes ?? 120,
+    darkMode: settings?.darkMode ?? false,
+    hiddenCategoryIds: next,
+  });
+}
+
+const DEFAULT_CONTEXT_CARD = {
+  why: "A custom category that matters to you.",
+  winCondition: "Progress made and clarity gained.",
+  script: "One step at a time.",
+};
+
+export async function addCustomCategory(
+  name: string,
+  domain: TaskDomain,
+  contextCard?: { why: string; winCondition: string; script: string }
+): Promise<Category | null> {
+  const customCount = await db.categories.where("kind").equals("CUSTOM").count();
+  if (customCount >= 5) return null;
+
+  const category: Category = {
+    id: generateId(),
+    name: name.trim(),
+    kind: "CUSTOM",
+    domain,
+    contextCard: contextCard ?? DEFAULT_CONTEXT_CARD,
+  };
+  await db.categories.add(category);
+  return category;
+}
+
+export async function deleteCustomCategory(id: string): Promise<boolean> {
+  const cat = await db.categories.get(id);
+  if (!cat || cat.kind !== "CUSTOM") return false;
+
+  const tasksInCategory = await db.tasks.where("categoryId").equals(id).toArray();
+  const defaultCats = (await db.categories.where("domain").equals(cat.domain).toArray())
+    .filter((c) => c.kind !== "CUSTOM");
+  const fallbackId = defaultCats[0]?.id;
+  const now = nowISO();
+
+  if (fallbackId && tasksInCategory.length > 0) {
+    for (const t of tasksInCategory) {
+      await db.tasks.update(t.id, { categoryId: fallbackId, updatedAt: now });
+    }
+  }
+
+  await db.categories.delete(id);
+  return true;
+}
+
+export function getCustomCategories(categories: Category[]): Category[] {
+  return categories.filter((c) => c.kind === "CUSTOM");
+}
+
+export function getDefaultCategories(categories: Category[]): Category[] {
+  return categories.filter((c) => c.kind !== "CUSTOM");
 }
 
 export function getWaitingTasks(tasks: Task[], domain: TaskDomain): Task[] {
@@ -731,5 +828,6 @@ export async function seedDatabase() {
     availableMinutes: 120,
     builderAvailableMinutes: 120,
     darkMode: false,
+    hiddenCategoryIds: [],
   });
 }

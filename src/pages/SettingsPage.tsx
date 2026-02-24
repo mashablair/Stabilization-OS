@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, type Category, type Task, type TimeEntry, type WeeklyReview, type DailyCapacity } from "../db";
+import { db, type Category, type Task, type TimeEntry, type WeeklyReview, type DailyCapacity, type AppSettings } from "../db";
 
 interface ShareBundle {
   meta: { version: string; exportedAt: string; timezone: string };
@@ -9,6 +9,7 @@ interface ShareBundle {
   timeEntries: TimeEntry[];
   weeklyReviews?: WeeklyReview[];
   dailyCapacity?: DailyCapacity[];
+  appSettings?: AppSettings;
 }
 
 export default function SettingsPage() {
@@ -19,8 +20,16 @@ export default function SettingsPage() {
   const stabilizerDefault = settings?.availableMinutes ?? 120;
   const builderDefault = settings?.builderAvailableMinutes ?? 120;
 
-  const updateSetting = (field: string, value: number) => {
-    db.appSettings.update("default", { [field]: Math.max(0, value) });
+  const updateSetting = (
+    field: "availableMinutes" | "builderAvailableMinutes",
+    value: number
+  ) => {
+    const v = Math.max(0, value);
+    if (field === "availableMinutes") {
+      db.appSettings.update("default", { availableMinutes: v });
+    } else {
+      db.appSettings.update("default", { builderAvailableMinutes: v });
+    }
   };
 
   const exportBundle = async () => {
@@ -29,6 +38,7 @@ export default function SettingsPage() {
     const timeEntries = await db.timeEntries.toArray();
     const weeklyReviews = await db.weeklyReviews.toArray();
     const dailyCapacity = await db.dailyCapacity.toArray();
+    const appSettings = await db.appSettings.get("default");
 
     const bundle: ShareBundle = {
       meta: {
@@ -41,6 +51,7 @@ export default function SettingsPage() {
       timeEntries,
       weeklyReviews,
       dailyCapacity,
+      appSettings: appSettings ?? undefined,
     };
 
     const blob = new Blob([JSON.stringify(bundle, null, 2)], {
@@ -69,7 +80,7 @@ export default function SettingsPage() {
 
       await db.transaction(
         "rw",
-        [db.categories, db.tasks, db.timeEntries, db.weeklyReviews, db.dailyCapacity],
+        [db.categories, db.tasks, db.timeEntries, db.weeklyReviews, db.dailyCapacity, db.appSettings],
         async () => {
           await db.categories.clear();
           await db.tasks.clear();
@@ -85,6 +96,9 @@ export default function SettingsPage() {
           }
           if (bundle.dailyCapacity) {
             await db.dailyCapacity.bulkAdd(bundle.dailyCapacity);
+          }
+          if (bundle.appSettings) {
+            await db.appSettings.put(bundle.appSettings);
           }
         }
       );
