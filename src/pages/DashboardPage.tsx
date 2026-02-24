@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
+import type { TaskDomain } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
 import {
   BarChart,
@@ -14,22 +15,78 @@ import {
   Line,
 } from "recharts";
 
+type FilterTab = "All" | "Stabilizer" | "Builder";
+
 export default function DashboardPage() {
+  const [filterTab, setFilterTab] = useState<FilterTab>("All");
+  const settings = useLiveQuery(() => db.appSettings.get("default"));
   const tasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
   const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
   const timeEntries = useLiveQuery(() => db.timeEntries.toArray()) ?? [];
+  const isDark = settings?.darkMode ?? false;
+
+  const chartTooltipStyle = useMemo(
+    () =>
+      isDark
+        ? {
+            contentStyle: {
+              backgroundColor: "#1e293b",
+              color: "#f1f5f9",
+              border: "1px solid #334155",
+              borderRadius: "0.5rem",
+              padding: "0.5rem 0.75rem",
+            },
+            labelStyle: { color: "#f1f5f9" },
+            itemStyle: { color: "#f1f5f9" },
+          }
+        : {
+            contentStyle: {
+              backgroundColor: "#fff",
+              color: "#334155",
+              border: "1px solid #e2e8f0",
+              borderRadius: "0.5rem",
+              padding: "0.5rem 0.75rem",
+            },
+            labelStyle: { color: "#334155" },
+            itemStyle: { color: "#334155" },
+          },
+    [isDark]
+  );
 
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 86400000);
 
+  const domain: TaskDomain | null =
+    filterTab === "Stabilizer" ? "LIFE_ADMIN" : filterTab === "Builder" ? "BUSINESS" : null;
+
+  const filteredTasks = useMemo(() => {
+    if (!domain) return tasks;
+    return tasks.filter((t) => t.domain === domain);
+  }, [tasks, domain]);
+
+  const filteredTaskIds = useMemo(
+    () => new Set(filteredTasks.map((t) => t.id)),
+    [filteredTasks]
+  );
+
+  const filteredTimeEntries = useMemo(() => {
+    if (!domain) return timeEntries;
+    return timeEntries.filter((e) => filteredTaskIds.has(e.taskId));
+  }, [timeEntries, filteredTaskIds, domain]);
+
+  const filteredCategories = useMemo(() => {
+    if (!domain) return categories;
+    return categories.filter((c) => c.domain === domain);
+  }, [categories, domain]);
+
   const stats = useMemo(() => {
-    const recentDone = tasks.filter(
+    const recentDone = filteredTasks.filter(
       (t) => (t.status === "DONE" || t.status === "ARCHIVED") &&
         t.completedAt && new Date(t.completedAt) >= weekAgo
     );
     const completedCount = recentDone.length;
 
-    const recentEntries = timeEntries.filter(
+    const recentEntries = filteredTimeEntries.filter(
       (e) => e.endAt && new Date(e.startAt) >= weekAgo
     );
     const totalSeconds = recentEntries.reduce((s, e) => s + e.seconds, 0);
@@ -38,17 +95,16 @@ export default function DashboardPage() {
       .filter((t) => t.moneyImpact && t.moneyImpact > 0)
       .reduce((s, t) => s + (t.moneyImpact ?? 0), 0);
 
-    const openLoops = tasks.filter(
+    const openLoops = filteredTasks.filter(
       (t) => t.status !== "DONE" && t.status !== "ARCHIVED"
     ).length;
 
     return { completedCount, totalSeconds, moneyRecovered, openLoops };
-  }, [tasks, timeEntries, weekAgo]);
+  }, [filteredTasks, filteredTimeEntries, weekAgo]);
 
   const catChartData = useMemo(() => {
-    const catMap = new Map(categories.map((c) => [c.id, c]));
-    return categories.map((cat) => {
-      const catTasks = tasks.filter((t) => t.categoryId === cat.id);
+    return filteredCategories.map((cat) => {
+      const catTasks = filteredTasks.filter((t) => t.categoryId === cat.id);
       const planned = catTasks.reduce(
         (s, t) => s + (t.estimateMinutes ?? 0),
         0
@@ -58,14 +114,14 @@ export default function DashboardPage() {
       );
       return { name: cat.name, Planned: planned, Actual: actual };
     });
-  }, [categories, tasks]);
+  }, [filteredCategories, filteredTasks]);
 
   const openLoopsTrend = useMemo(() => {
     const days = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 86400000);
       const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
-      const openAtDay = tasks.filter((t) => {
+      const openAtDay = filteredTasks.filter((t) => {
         if (t.status === "DONE" || t.status === "ARCHIVED") {
           const doneDate = new Date(t.completedAt ?? t.updatedAt);
           return doneDate > d;
@@ -75,11 +131,11 @@ export default function DashboardPage() {
       days.push({ day: dayName, count: Math.max(openAtDay, 0) });
     }
     return days;
-  }, [tasks, now]);
+  }, [filteredTasks, now]);
 
   const frictionItems = useMemo(() => {
     const items: Array<{ type: string; text: string; note: string }> = [];
-    const recentEntries = timeEntries.filter(
+    const recentEntries = filteredTimeEntries.filter(
       (e) => e.pauseReason && new Date(e.startAt) >= weekAgo
     );
     const reasons = new Map<string, number>();
@@ -95,7 +151,7 @@ export default function DashboardPage() {
       });
     });
 
-    tasks
+    filteredTasks
       .filter((t) => t.frictionNote && t.status !== "DONE" && t.status !== "ARCHIVED")
       .slice(0, 5)
       .forEach((t) => {
@@ -106,7 +162,7 @@ export default function DashboardPage() {
         });
       });
 
-    const mismatches = tasks
+    const mismatches = filteredTasks
       .filter(
         (t) =>
           (t.status === "DONE" || t.status === "ARCHIVED") &&
@@ -132,7 +188,7 @@ export default function DashboardPage() {
     });
 
     return items;
-  }, [tasks, timeEntries, weekAgo]);
+  }, [filteredTasks, filteredTimeEntries, weekAgo]);
 
   const typeColors: Record<string, string> = {
     Pause: "border-primary/40",
@@ -158,6 +214,22 @@ export default function DashboardPage() {
             {weekAgo.toLocaleDateString()} –{" "}
             {now.toLocaleDateString()} • Retrospective
           </p>
+        </div>
+        <div className="flex p-1.5 rounded-xl bg-slate-200 dark:bg-card-dark border border-slate-300 dark:border-border-dark w-full md:w-auto max-w-sm">
+          {(["All", "Stabilizer", "Builder"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setFilterTab(t)}
+              className={`flex cursor-pointer h-10 flex-1 md:flex-initial md:min-w-[100px] items-center justify-center overflow-hidden rounded-lg px-4 transition-all text-sm font-semibold ${
+                filterTab === t
+                  ? "bg-gradient-accent text-white shadow-lg shadow-primary/20"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -212,7 +284,7 @@ export default function DashboardPage() {
                 <BarChart data={catChartData}>
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip />
+                  <Tooltip {...chartTooltipStyle} />
                   <Legend />
                   <Bar
                     dataKey="Planned"
@@ -261,7 +333,7 @@ export default function DashboardPage() {
                 <LineChart data={openLoopsTrend}>
                   <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip />
+                  <Tooltip {...chartTooltipStyle} />
                   <Line
                     type="monotone"
                     dataKey="count"
