@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, generateId, nowISO, type Task, type TaskDomain } from "../db";
+import { db, generateId, nowISO, getCategoriesByDomain, type Task, type TaskDomain } from "../db";
 
 interface Props {
   open: boolean;
@@ -11,14 +11,18 @@ interface Props {
 }
 
 export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_ADMIN", addToTodayStack = false }: Props) {
-  const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
+  const allCategories = useLiveQuery(() => db.categories.toArray()) ?? [];
+  const [domain, setDomain] = useState<TaskDomain>(defaultDomain);
+  const categories = getCategoriesByDomain(allCategories, domain);
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [estimate, setEstimate] = useState(25);
-  const [domain, setDomain] = useState<TaskDomain>(defaultDomain);
 
   useEffect(() => {
-    if (open) setDomain(defaultDomain);
+    if (open) {
+      setDomain(defaultDomain);
+      setCategoryId("");
+    }
   }, [open, defaultDomain]);
 
   if (!open) return null;
@@ -85,11 +89,16 @@ export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_A
                 Domain
               </label>
               <div className="flex gap-2">
-                {(["LIFE_ADMIN", "BUSINESS"] as const).map((d) => (
+                {(["LIFE_ADMIN", "BUSINESS"] as const).map((d) => {
+                  const catsForDomain = getCategoriesByDomain(allCategories, d);
+                  return (
                   <button
                     key={d}
                     type="button"
-                    onClick={() => setDomain(d)}
+                    onClick={() => {
+                      setDomain(d);
+                      setCategoryId(catsForDomain[0]?.id ?? "");
+                    }}
                     className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
                       domain === d
                         ? "bg-primary/10 text-primary border-primary"
@@ -98,7 +107,7 @@ export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_A
                   >
                     {d === "LIFE_ADMIN" ? "Life Admin" : "Business"}
                   </button>
-                ))}
+                );})}
               </div>
             </div>
 

@@ -32,11 +32,12 @@ function makeTask(overrides: Partial<Task> = {}): Task {
   };
 }
 
-function makeCategory(kind: CategoryKind, id: string): Category {
+function makeCategory(kind: CategoryKind, id: string, domain: "LIFE_ADMIN" | "BUSINESS" = "LIFE_ADMIN"): Category {
   return {
     id,
     name: kind,
     kind,
+    domain,
     contextCard: { why: "", winCondition: "", script: "" },
   };
 }

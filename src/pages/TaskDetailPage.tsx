@@ -1,6 +1,6 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, generateId, nowISO, markTaskDone, unmarkTaskDone } from "../db";
+import { db, generateId, nowISO, markTaskDone, unmarkTaskDone, getCategoriesByDomain } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
 import { useState, useEffect } from "react";
 
@@ -22,7 +22,8 @@ export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const task = useLiveQuery(() => (id ? db.tasks.get(id) : undefined), [id]);
-  const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
+  const allCategories = useLiveQuery(() => db.categories.toArray()) ?? [];
+  const categories = getCategoriesByDomain(allCategories, task?.domain ?? "LIFE_ADMIN");
   const timeEntries = useLiveQuery(
     () => (id ? db.timeEntries.where("taskId").equals(id).toArray() : []),
     [id]
@@ -46,7 +47,7 @@ export default function TaskDetailPage() {
     );
   }
 
-  const cat = categories.find((c) => c.id === task.categoryId);
+  const cat = allCategories.find((c) => c.id === task.categoryId);
   const isActive = timer.activeTaskId === task.id;
   const isRunning = isActive && timer.isRunning;
 
@@ -591,11 +592,19 @@ export default function TaskDetailPage() {
                 Domain
               </label>
               <div className="flex gap-2">
-                {(["LIFE_ADMIN", "BUSINESS"] as const).map((d) => (
+                {(["LIFE_ADMIN", "BUSINESS"] as const).map((d) => {
+                  const catsForDomain = getCategoriesByDomain(allCategories, d);
+                  const defaultCatId = catsForDomain[0]?.id;
+                  return (
                   <button
                     key={d}
                     type="button"
-                    onClick={() => update({ domain: d })}
+                    onClick={() =>
+                      update({
+                        domain: d,
+                        ...(defaultCatId && { categoryId: defaultCatId }),
+                      })
+                    }
                     className={`flex-1 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${
                       task.domain === d
                         ? "bg-primary/10 text-primary border-primary"
@@ -604,7 +613,7 @@ export default function TaskDetailPage() {
                   >
                     {d === "LIFE_ADMIN" ? "Life Admin" : "Business"}
                   </button>
-                ))}
+                );})}
               </div>
             </div>
 

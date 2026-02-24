@@ -1,13 +1,16 @@
 import Dexie, { type EntityTable } from "dexie";
 
 export type TaskDomain = "LIFE_ADMIN" | "BUSINESS";
-export type CategoryKind = "LEGAL" | "MONEY" | "MAINTENANCE" | "CAREGIVER";
+export type LifeAdminCategoryKind = "LEGAL" | "MONEY" | "MAINTENANCE" | "CAREGIVER";
+export type BuilderCategoryKind = "LEGAL" | "CONTENT" | "PRODUCT" | "NETWORKING" | "LEARNING" | "OPS";
+export type CategoryKind = LifeAdminCategoryKind | BuilderCategoryKind;
 export type TaskStatus = "BACKLOG" | "TODAY" | "IN_PROGRESS" | "PENDING" | "DONE" | "ARCHIVED";
 
 export interface Category {
   id: string;
   name: string;
   kind: CategoryKind;
+  domain: TaskDomain;
   contextCard: { why: string; winCondition: string; script: string };
 }
 
@@ -136,6 +139,41 @@ db.version(3).stores({
   wins: "id, date, createdAt",
 });
 
+db.version(4).stores({
+  categories: "id, kind, domain",
+  tasks: "id, categoryId, status, priority, domain",
+  timeEntries: "id, taskId",
+  weeklyReviews: "id, weekStart",
+  timerState: "id",
+  appSettings: "id",
+  dailyCapacity: "id, [date+domain]",
+  wins: "id, date, createdAt",
+}).upgrade(async (tx) => {
+  const cats = await tx.table("categories").toArray();
+  const oldLegalId = cats.find((c: { kind: string }) => c.kind === "LEGAL")?.id;
+  for (const c of cats) {
+    await tx.table("categories").update(c.id, { domain: "LIFE_ADMIN" });
+  }
+  const builderCats = [
+    { id: generateId(), name: "LEGAL", kind: "LEGAL", domain: "BUSINESS", contextCard: { why: "Protects your business and intellectual property. Compliance and contracts reduce future risk.", winCondition: "All business-critical documents filed, agreements signed, and compliance current.", script: "One step at a time. Your business is protected." } },
+    { id: generateId(), name: "CONTENT", kind: "CONTENT", domain: "BUSINESS", contextCard: { why: "Content builds reach and trust. Each piece compounds your audience and authority.", winCondition: "Consistent output that serves your audience and advances your message.", script: "Ship it. Done is better than perfect." } },
+    { id: generateId(), name: "PRODUCT", kind: "PRODUCT", domain: "BUSINESS", contextCard: { why: "The product is what delivers value. Building and refining it is core to your business.", winCondition: "Core features work, users are unblocked, and the roadmap is clear.", script: "Focus on the next release. Iterate." } },
+    { id: generateId(), name: "NETWORKING", kind: "NETWORKING", domain: "BUSINESS", contextCard: { why: "Relationships open doors. Warm outreach and genuine connection create opportunities.", winCondition: "Key relationships nurtured, introductions made, and you show up consistently.", script: "One conversation at a time. Be helpful." } },
+    { id: generateId(), name: "LEARNING", kind: "LEARNING", domain: "BUSINESS", contextCard: { why: "Skills compound. Learning keeps you sharp and ahead of shifts in your field.", winCondition: "Time blocked for learning, skills applied, and knowledge gaps closing.", script: "Small increments. You're building capability." } },
+    { id: generateId(), name: "OPS", kind: "OPS", domain: "BUSINESS", contextCard: { why: "Operations keep everything running. Tools, systems, and processes prevent chaos.", winCondition: "Systems work, vendors are managed, and the machine runs smoothly.", script: "Fix the leak. Automate the repeat." } },
+  ];
+  const builderLegalId = builderCats[0].id;
+  const builderOpsId = builderCats[5].id;
+  for (const b of builderCats) {
+    await tx.table("categories").add(b);
+  }
+  const businessTasks = await tx.table("tasks").where("domain").equals("BUSINESS").toArray();
+  for (const t of businessTasks) {
+    const newCatId = t.categoryId === oldLegalId ? builderLegalId : builderOpsId;
+    await tx.table("tasks").update(t.id, { categoryId: newCatId });
+  }
+});
+
 export { db };
 
 export function generateId(): string {
@@ -240,10 +278,17 @@ export async function unmarkTaskDone(taskId: string): Promise<void> {
 // --- Scoring ---
 
 const KIND_WEIGHTS: Record<string, number> = {
+  // Life Admin
   LEGAL: 40,
   MONEY: 30,
   MAINTENANCE: 10,
   CAREGIVER: 5,
+  // Builder
+  CONTENT: 25,
+  PRODUCT: 30,
+  NETWORKING: 20,
+  LEARNING: 15,
+  OPS: 10,
 };
 
 export function scoreTask(
@@ -361,6 +406,10 @@ export function buildStabilizerStack(
   return [...pinned, ...suggested];
 }
 
+export function getCategoriesByDomain(categories: Category[], domain: TaskDomain): Category[] {
+  return categories.filter((c) => c.domain === domain);
+}
+
 export function getWaitingTasks(tasks: Task[], domain: TaskDomain): Task[] {
   return tasks
     .filter((t) => t.domain === domain && isWaiting(t))
@@ -378,11 +427,12 @@ export async function seedDatabase() {
   if (catCount > 0) return;
 
   const now = nowISO();
-  const categories: Category[] = [
+  const lifeAdminCategories: Category[] = [
     {
       id: generateId(),
       name: "LEGAL",
       kind: "LEGAL",
+      domain: "LIFE_ADMIN",
       contextCard: {
         why: "Fundamental security and peace of mind. Ensures your life and business have a protected foundation.",
         winCondition:
@@ -394,6 +444,7 @@ export async function seedDatabase() {
       id: generateId(),
       name: "MONEY",
       kind: "MONEY",
+      domain: "LIFE_ADMIN",
       contextCard: {
         why: "The fuel for your projects and family. Financial clarity removes the weight of the unknown.",
         winCondition:
@@ -405,6 +456,7 @@ export async function seedDatabase() {
       id: generateId(),
       name: "MAINTENANCE",
       kind: "MAINTENANCE",
+      domain: "LIFE_ADMIN",
       contextCard: {
         why: "Your environment and body. Small leaks sink great ships; keeping the baseline prevents chaos.",
         winCondition:
@@ -416,6 +468,7 @@ export async function seedDatabase() {
       id: generateId(),
       name: "CAREGIVER",
       kind: "CAREGIVER",
+      domain: "LIFE_ADMIN",
       contextCard: {
         why: "People and relationships. Caregiving, family, and connection are the foundation of stability.",
         winCondition:
@@ -425,7 +478,17 @@ export async function seedDatabase() {
     },
   ];
 
-  await db.categories.bulkAdd(categories);
+  const builderCategories: Category[] = [
+    { id: generateId(), name: "LEGAL", kind: "LEGAL", domain: "BUSINESS", contextCard: { why: "Protects your business and intellectual property. Compliance and contracts reduce future risk.", winCondition: "All business-critical documents filed, agreements signed, and compliance current.", script: "One step at a time. Your business is protected." } },
+    { id: generateId(), name: "CONTENT", kind: "CONTENT", domain: "BUSINESS", contextCard: { why: "Content builds reach and trust. Each piece compounds your audience and authority.", winCondition: "Consistent output that serves your audience and advances your message.", script: "Ship it. Done is better than perfect." } },
+    { id: generateId(), name: "PRODUCT", kind: "PRODUCT", domain: "BUSINESS", contextCard: { why: "The product is what delivers value. Building and refining it is core to your business.", winCondition: "Core features work, users are unblocked, and the roadmap is clear.", script: "Focus on the next release. Iterate." } },
+    { id: generateId(), name: "NETWORKING", kind: "NETWORKING", domain: "BUSINESS", contextCard: { why: "Relationships open doors. Warm outreach and genuine connection create opportunities.", winCondition: "Key relationships nurtured, introductions made, and you show up consistently.", script: "One conversation at a time. Be helpful." } },
+    { id: generateId(), name: "LEARNING", kind: "LEARNING", domain: "BUSINESS", contextCard: { why: "Skills compound. Learning keeps you sharp and ahead of shifts in your field.", winCondition: "Time blocked for learning, skills applied, and knowledge gaps closing.", script: "Small increments. You're building capability." } },
+    { id: generateId(), name: "OPS", kind: "OPS", domain: "BUSINESS", contextCard: { why: "Operations keep everything running. Tools, systems, and processes prevent chaos.", winCondition: "Systems work, vendors are managed, and the machine runs smoothly.", script: "Fix the leak. Automate the repeat." } },
+  ];
+
+  await db.categories.bulkAdd([...lifeAdminCategories, ...builderCategories]);
+  const categories = lifeAdminCategories;
 
   const legalId = categories[0].id;
   const moneyId = categories[1].id;

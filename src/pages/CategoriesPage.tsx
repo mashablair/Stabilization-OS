@@ -1,33 +1,44 @@
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../db";
+import { db, getCategoriesByDomain } from "../db";
 
 const kindIcons: Record<string, string> = {
   LEGAL: "gavel",
   MONEY: "account_balance_wallet",
   MAINTENANCE: "home_repair_service",
   CAREGIVER: "favorite",
+  CONTENT: "edit_note",
+  PRODUCT: "precision_manufacturing",
+  NETWORKING: "groups",
+  LEARNING: "school",
+  OPS: "settings",
 };
 
 export default function CategoriesPage() {
-  const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
+  const allCategories = useLiveQuery(() => db.categories.toArray()) ?? [];
+  const lifeAdminCategories = getCategoriesByDomain(allCategories, "LIFE_ADMIN");
+  const builderCategories = getCategoriesByDomain(allCategories, "BUSINESS");
   const tasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
 
   const getTasksForCategory = (catId: string) =>
     tasks.filter((t) => t.categoryId === catId);
 
-  return (
-    <div className="max-w-[1400px] mx-auto w-full px-6 py-10 lg:px-20 pb-24 md:pb-10">
-      <div className="flex flex-col gap-2 mb-10">
-        <h1 className="text-4xl font-bold tracking-tight">
-          Categories Overview
-        </h1>
-        <p className="text-slate-500 dark:text-slate-400 text-lg max-w-2xl leading-relaxed">
-          A calm space to manage your high-level domains. Clear the mental
-          clutter by grounding yourself in what matters most.
-        </p>
-      </div>
-
+  const CategorySection = ({
+    title,
+    description,
+    categories,
+  }: {
+    title: string;
+    description: string;
+    categories: typeof allCategories;
+  }) => (
+    <div>
+      <h2 className="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">
+        {title}
+      </h2>
+      <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
+        {description}
+      </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
         {categories.map((cat) => {
           const catTasks = getTasksForCategory(cat.id);
@@ -93,6 +104,33 @@ export default function CategoriesPage() {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-[1400px] mx-auto w-full px-6 py-10 lg:px-20 pb-24 md:pb-10">
+      <div className="flex flex-col gap-2 mb-10">
+        <h1 className="text-4xl font-bold tracking-tight">
+          Categories Overview
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 text-lg max-w-2xl leading-relaxed">
+          A calm space to manage your high-level domains. Clear the mental
+          clutter by grounding yourself in what matters most.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-12">
+        <CategorySection
+          title="Stabilizer (Life Admin)"
+          description="Categories for keeping life running smoothly."
+          categories={lifeAdminCategories}
+        />
+        <CategorySection
+          title="Builder (Business)"
+          description="Categories for building your business and projects."
+          categories={builderCategories}
+        />
       </div>
 
       <div className="mt-16 bg-gradient-accent/5 rounded-xl p-8 border border-primary/20">
