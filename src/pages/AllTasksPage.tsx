@@ -4,6 +4,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import {
   db,
   buildStabilizerStackSplit,
+  getWaitingTasks,
   isActionable,
   nowISO,
   markTaskDone,
@@ -17,6 +18,23 @@ import { formatMinutes } from "../hooks/useTimer";
 
 type DomainTab = "Stabilizer" | "Builder";
 type DoneTab = "Completed" | "Archived";
+
+function daysUntil(dateStr: string): number {
+  return Math.ceil(
+    (new Date(dateStr).getTime() - Date.now()) / 86_400_000
+  );
+}
+
+function formatNextAction(dateStr: string): string {
+  const days = daysUntil(dateStr);
+  const formatted = new Date(dateStr).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  if (days <= 0) return `${formatted} (today)`;
+  if (days === 1) return `${formatted} (tomorrow)`;
+  return `${formatted} (in ${days} days)`;
+}
 
 export default function AllTasksPage() {
   const [searchParams] = useSearchParams();
@@ -35,6 +53,7 @@ export default function AllTasksPage() {
 
   const [doneOpen, setDoneOpen] = useState(false);
   const [doneTab, setDoneTab] = useState<DoneTab>("Completed");
+  const [pendingOpen, setPendingOpen] = useState(false);
 
   const domain = domainTab === "Stabilizer" ? "LIFE_ADMIN" : "BUSINESS";
   const actionableTasks = allTasks.filter(
@@ -72,6 +91,8 @@ export default function AllTasksPage() {
         new Date(a.completedAt ?? a.updatedAt).getTime()
     );
 
+  const pendingTasks = getWaitingTasks(allTasks, domain);
+
   const catMap = new Map(categories.map((c) => [c.id, c]));
 
   const pinTask = async (task: Task) => {
@@ -79,6 +100,14 @@ export default function AllTasksPage() {
   };
   const unpinTask = async (task: Task) => {
     await db.tasks.update(task.id, { status: "BACKLOG", updatedAt: nowISO() });
+  };
+  const makeActionable = async (taskId: string) => {
+    await db.tasks.update(taskId, {
+      status: "BACKLOG",
+      nextActionAt: undefined,
+      pendingReason: undefined,
+      updatedAt: nowISO(),
+    });
   };
   const isPinned = (task: Task) => task.status === "TODAY";
   const stackFull = domainTab === "Stabilizer" && pinnedIds.size >= 5;
@@ -190,6 +219,81 @@ export default function AllTasksPage() {
           )}
         </div>
       </div>
+
+      {/* Pending section */}
+      {pendingTasks.length > 0 && (
+        <div className="mt-10">
+          <button
+            type="button"
+            onClick={() => setPendingOpen(!pendingOpen)}
+            className="flex items-center gap-3 py-3 text-left group w-full"
+          >
+            <span
+              className={`material-symbols-outlined text-slate-400 transition-transform ${pendingOpen ? "rotate-90" : ""}`}
+            >
+              chevron_right
+            </span>
+            <h3 className="text-lg font-bold text-slate-600 dark:text-slate-300 group-hover:text-primary transition-colors">
+              Pending
+            </h3>
+            <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold">
+              {pendingTasks.length}
+            </span>
+          </button>
+
+          {pendingOpen && (
+            <div className="mt-2 flex flex-col gap-2">
+              {pendingTasks.map((task) => {
+                const cat = catMap.get(task.categoryId);
+                return (
+                  <div
+                    key={task.id}
+                    className="flex items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 dark:border-border-dark bg-white/60 dark:bg-card-dark/50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                          Pending
+                        </span>
+                        {cat && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest bg-slate-100 dark:bg-border-dark text-slate-500 dark:text-slate-400">
+                            {cat.name}
+                          </span>
+                        )}
+                      </div>
+                      <Link
+                        to={`/tasks/${task.id}`}
+                        className="hover:text-primary transition-colors"
+                      >
+                        <h4 className="font-semibold truncate">{task.title}</h4>
+                      </Link>
+                      <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
+                        {task.nextActionAt && (
+                          <span className="flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm">event</span>
+                            Next action: {formatNextAction(task.nextActionAt)}
+                          </span>
+                        )}
+                      </div>
+                      {task.pendingReason && (
+                        <p className="text-xs text-slate-400 italic mt-1">
+                          {task.pendingReason}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => makeActionable(task.id)}
+                      className="shrink-0 px-3 py-2 rounded-lg border border-slate-200 dark:border-border-dark text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-primary hover:text-primary transition-all"
+                    >
+                      Make actionable
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Done / Archived section */}
       {(completedTasks.length > 0 || archivedTasks.length > 0) && (
