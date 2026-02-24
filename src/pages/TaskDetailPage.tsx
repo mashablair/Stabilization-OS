@@ -32,11 +32,15 @@ export default function TaskDetailPage() {
   const [newSubtask, setNewSubtask] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitle, setEditingTitle] = useState("");
+  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
+  const [editingSubtaskTitle, setEditingSubtaskTitle] = useState("");
   const [addTimeInput, setAddTimeInput] = useState("");
 
   useEffect(() => {
     setIsEditingTitle(false);
     setEditingTitle("");
+    setEditingSubtaskId(null);
+    setEditingSubtaskTitle("");
   }, [id]);
 
   if (!task) {
@@ -76,6 +80,16 @@ export default function TaskDetailPage() {
 
   const removeSubtask = async (subId: string) => {
     await update({ subtasks: task.subtasks.filter((s) => s.id !== subId) });
+  };
+
+  const updateSubtask = async (subId: string, newTitle: string) => {
+    const trimmed = newTitle.trim();
+    const sub = task.subtasks.find((s) => s.id === subId);
+    if (!sub || trimmed === sub.title) return;
+    const updated = task.subtasks.map((s) =>
+      s.id === subId ? { ...s, title: trimmed } : s
+    );
+    await update({ subtasks: updated });
   };
 
   const deleteTask = async () => {
@@ -317,9 +331,41 @@ export default function TaskDetailPage() {
                       <span className="material-symbols-outlined text-white text-[14px] font-bold">check</span>
                     )}
                   </button>
-                  <span className={`text-sm flex-1 ${sub.done ? "text-slate-400 line-through" : ""}`}>
-                    {sub.title}
-                  </span>
+                  {editingSubtaskId === sub.id ? (
+                    <input
+                      className="flex-1 text-sm bg-transparent border-none focus:ring-0 p-0 focus:outline-none border-b-2 border-primary min-w-0"
+                      value={editingSubtaskTitle}
+                      onChange={(e) => setEditingSubtaskTitle(e.target.value)}
+                      onBlur={async () => {
+                        await updateSubtask(sub.id, editingSubtaskTitle);
+                        setEditingSubtaskId(null);
+                        setEditingSubtaskTitle("");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.currentTarget.blur();
+                        }
+                        if (e.key === "Escape") {
+                          setEditingSubtaskTitle(sub.title);
+                          setEditingSubtaskId(null);
+                        }
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingSubtaskTitle(sub.title);
+                        setEditingSubtaskId(sub.id);
+                      }}
+                      className={`text-sm flex-1 text-left min-w-0 truncate ${
+                        sub.done ? "text-slate-400 line-through" : ""
+                      } hover:opacity-80 transition-opacity`}
+                    >
+                      {sub.title || <span className="text-slate-400 italic">Click to edit</span>}
+                    </button>
+                  )}
                   <button
                     onClick={() => removeSubtask(sub.id)}
                     className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-opacity"

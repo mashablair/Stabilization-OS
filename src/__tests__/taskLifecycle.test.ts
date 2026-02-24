@@ -124,6 +124,29 @@ describe("unmarkTaskDone", () => {
   });
 });
 
+describe("subtask updates", () => {
+  it("updating subtask title persists correctly", async () => {
+    const task = makeTask({
+      subtasks: [
+        { id: "s1", title: "Original title", done: false },
+        { id: "s2", title: "Another", done: true },
+      ],
+    });
+    await db.tasks.add(task);
+
+    const updated = task.subtasks.map((s) =>
+      s.id === "s1" ? { ...s, title: "Updated title" } : s
+    );
+    await db.tasks.update(task.id, { subtasks: updated, updatedAt: nowISO() });
+
+    const fetched = await db.tasks.get(task.id);
+    expect(fetched!.subtasks.find((s) => s.id === "s1")!.title).toBe(
+      "Updated title"
+    );
+    expect(fetched!.subtasks.find((s) => s.id === "s2")!.title).toBe("Another");
+  });
+});
+
 describe("full lifecycle: BACKLOG → DONE → ARCHIVED → BACKLOG", () => {
   it("round-trips through the complete lifecycle", async () => {
     const task = makeTask();
