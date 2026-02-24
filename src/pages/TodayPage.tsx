@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, buildStabilizerStackSplit, getWaitingTasks, isActionable, markTaskDone, nowISO, unmarkTaskDone, getEffectiveMinutes, setDailyCapacity, clearDailyCapacity, todayDateStr } from "../db";
@@ -7,8 +7,6 @@ import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
 import QuickEntryModal from "../components/QuickEntryModal";
 import AllTasksDrawer from "../components/AllTasksDrawer";
 import CapacityAdjustPopover from "../components/CapacityAdjustPopover";
-import LogWinPopover from "../components/LogWinPopover";
-
 type Tab = "Stabilizer" | "Builder";
 
 function daysUntil(dateStr: string): number {
@@ -34,8 +32,6 @@ export default function TodayPage() {
   const allTasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
   const [showModal, setShowModal] = useState(false);
   const [showAllTasksDrawer, setShowAllTasksDrawer] = useState(false);
-  const [logWinPopoverOpen, setLogWinPopoverOpen] = useState(false);
-  const logWinButtonRef = useRef<HTMLButtonElement>(null);
   const [tab, setTab] = useState<Tab>("Stabilizer");
   const [waitingOpen, setWaitingOpen] = useState(false);
   const [doneOpen, setDoneOpen] = useState(true);
@@ -691,20 +687,6 @@ export default function TodayPage() {
 
         <footer className="mt-8 flex flex-col items-center gap-4 py-8 border-t border-slate-200 dark:border-border-dark">
           <div className="relative flex flex-col items-center gap-4">
-            <button
-              ref={logWinButtonRef}
-              type="button"
-              onClick={() => setLogWinPopoverOpen(!logWinPopoverOpen)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-accent text-white font-bold text-sm shadow-lg shadow-primary/20 hover:opacity-90 transition-all"
-            >
-              <span className="material-symbols-outlined text-lg">emoji_events</span>
-              Log a win
-            </button>
-            <LogWinPopover
-              open={logWinPopoverOpen}
-              onClose={() => setLogWinPopoverOpen(false)}
-              anchorRef={logWinButtonRef}
-            />
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/5 text-primary rounded-full text-sm font-medium border border-primary/10">
               <span className="material-symbols-outlined text-sm">spa</span>
               Stay focused. One task at a time.
