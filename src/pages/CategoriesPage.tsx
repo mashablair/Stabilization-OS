@@ -81,11 +81,11 @@ export default function CategoriesPage() {
         <div className="flex justify-between items-center gap-3 mb-3">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="p-1.5 bg-gradient-accent rounded-lg text-white shrink-0">
-              <span className="material-symbols-outlined text-lg">
+              <span className="material-symbols-outlined text-base">
                 {kindIcons[cat.kind] ?? "category"}
               </span>
             </div>
-            <h3 className="text-lg font-bold tracking-tight truncate">
+            <h3 className="text-md font-semibold tracking-tight truncate">
               {cat.name}
             </h3>
           </div>
@@ -121,10 +121,7 @@ export default function CategoriesPage() {
         </div>
 
         <div className="grow min-h-0">
-          <span className="text-[10px] uppercase font-bold tracking-[0.15em] text-slate-400 dark:text-slate-500 block mb-0.5">
-            Why this matters
-          </span>
-          <p className="text-slate-600 dark:text-slate-300 text-sm leading-snug line-clamp-2">
+          <p className="card-why text-slate-600 dark:text-slate-300 text-xs leading-snug line-clamp-2">
             {cat.contextCard.why}
           </p>
         </div>
@@ -152,7 +149,7 @@ export default function CategoriesPage() {
     categories: Category[];
     showVisibilityToggle?: boolean;
   }) => (
-    <div>
+    <div className="mb-5">
       <h2 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-1">
         {title}
       </h2>
@@ -175,7 +172,7 @@ export default function CategoriesPage() {
     <div className="max-w-[1400px] mx-auto w-full px-6 py-10 lg:px-20 pb-24 md:pb-10">
       <div className="flex flex-col gap-2 mb-10">
         <h1 className="text-4xl font-bold tracking-tight">
-          Categories Overview
+          Categories
         </h1>
         <p className="text-slate-500 dark:text-slate-400 text-lg max-w-2xl leading-relaxed">
           A calm space to manage your high-level domains. Clear the mental
@@ -229,7 +226,7 @@ export default function CategoriesPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Custom
+                Custom Categories
               </h2>
               <p className="text-slate-500 dark:text-slate-400 text-sm">
                 Add up to {MAX_CUSTOM_CATEGORIES} custom categories.
