@@ -8,6 +8,7 @@ export type CategoryKind =
   | BuilderCategoryKind
   | "CUSTOM";
 export type TaskStatus = "BACKLOG" | "TODAY" | "IN_PROGRESS" | "PENDING" | "DONE" | "ARCHIVED";
+export type TimeTrackingMode = "TASK" | "PROJECT";
 
 export interface Category {
   id: string;
@@ -38,12 +39,22 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
-  subtasks: Array<{ id: string; title: string; done: boolean }>;
+  timeTrackingMode?: TimeTrackingMode;
+  subtasks: Subtask[];
+}
+
+export interface Subtask {
+  id: string;
+  title: string;
+  done: boolean;
+  estimateMinutes?: number;
+  actualSecondsTotal?: number;
 }
 
 export interface TimeEntry {
   id: string;
   taskId: string;
+  subtaskId?: string;
   startAt: string;
   endAt?: string;
   seconds: number;
@@ -64,6 +75,7 @@ export interface WeeklyReview {
 export interface TimerState {
   id: string;
   taskId: string;
+  subtaskId?: string;
   timeEntryId: string;
   startedAt: string;
   pausedAt?: string;
@@ -320,9 +332,10 @@ export function scoreTask(
 ): number {
   if (!isActionable(task)) return -1;
   if (task.blockedByTaskIds && task.blockedByTaskIds.length > 0) return -1;
+  const totalEstimate = getTaskEstimateMinutes(task);
   if (
-    task.estimateMinutes &&
-    task.estimateMinutes > availableMinutesRemaining &&
+    totalEstimate > 0 &&
+    totalEstimate > availableMinutesRemaining &&
     availableMinutesRemaining > 0
   )
     return -1;
@@ -345,7 +358,7 @@ export function scoreTask(
   if (task.status === "IN_PROGRESS") score += 20;
   // Explicitly pinned-for-today tasks always get priority (so they show in Today view)
   if (task.status === "TODAY") score += 50;
-  const est = task.estimateMinutes ?? 30;
+  const est = totalEstimate || 30;
   if (est <= 15) score += 12;
   else if (est <= 30) score += 8;
 
@@ -371,7 +384,7 @@ export function buildStabilizerStackSplit(
 
   const pinned = pool.filter((t) => t.status === "TODAY").slice(0, maxTasks);
   const pinnedIds = new Set(pinned.map((t) => t.id));
-  const pinnedMins = pinned.reduce((s, t) => s + (t.estimateMinutes ?? 15), 0);
+  const pinnedMins = pinned.reduce((s, t) => s + (getTaskEstimateMinutes(t) || 15), 0);
   const minsLeft = Math.max(0, remainingCapacity - pinnedMins);
 
   const scored = pool
@@ -393,7 +406,7 @@ export function buildStabilizerStackSplit(
     let usedMinutes = 0;
     for (const { task } of scoredList) {
       if (result.length >= cap) continue;
-      const est = task.estimateMinutes ?? 15;
+      const est = getTaskEstimateMinutes(task) || 15;
       if (usedMinutes + est > budget && usedMinutes > 0) continue;
       const kind = catMap.get(task.categoryId)?.kind ?? "";
       if ((kindCount[kind] ?? 0) >= 2 && scoredList.length > cap) continue;
@@ -430,6 +443,32 @@ export function buildStabilizerStack(
 
 export function getCategoriesByDomain(categories: Category[], domain: TaskDomain): Category[] {
   return categories.filter((c) => c.domain === domain);
+}
+
+export function isProjectMode(task: Task): boolean {
+  return task.timeTrackingMode === "PROJECT";
+}
+
+export function getTaskEstimateMinutes(task: Task): number {
+  if (!isProjectMode(task)) {
+    return task.estimateMinutes ?? 0;
+  }
+  return task.subtasks.reduce((sum, subtask) => sum + (subtask.estimateMinutes ?? 0), 0);
+}
+
+export function getTaskActualSeconds(task: Task): number {
+  if (!isProjectMode(task)) {
+    return task.actualSecondsTotal;
+  }
+  return task.subtasks.reduce((sum, subtask) => sum + (subtask.actualSecondsTotal ?? 0), 0);
+}
+
+export function stripSubtaskTimeFields(subtasks: Subtask[]): Array<{ id: string; title: string; done: boolean }> {
+  return subtasks.map((subtask) => ({
+    id: subtask.id,
+    title: subtask.title,
+    done: subtask.done,
+  }));
 }
 
 export async function getHiddenCategoryIds(): Promise<string[]> {

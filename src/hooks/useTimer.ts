@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { db, generateId, nowISO, type TimerState, type TimeEntry } from "../db";
+import { db, generateId, nowISO, type Subtask, type TimerState, type TimeEntry } from "../db";
 import { useLiveQuery } from "dexie-react-hooks";
 
 export function useTimer() {
@@ -29,14 +29,22 @@ export function useTimer() {
     };
   }, [timerState]);
 
+  const sumSubtaskActual = (subtasks: Subtask[]): number =>
+    subtasks.reduce((sum, subtask) => sum + (subtask.actualSecondsTotal ?? 0), 0);
+
   const startTimer = useCallback(
-    async (taskId: string) => {
-      if (timerState?.taskId && timerState.taskId !== taskId) {
+    async (taskId: string, subtaskId?: string) => {
+      const sameTarget =
+        timerState?.taskId === taskId && (timerState?.subtaskId ?? undefined) === (subtaskId ?? undefined);
+      if (timerState?.taskId && !sameTarget) {
         await stopTimer();
       }
 
       const existing = await db.timerState.get("active");
-      if (existing && existing.taskId === taskId && existing.pausedAt) {
+      const sameExistingTarget =
+        existing?.taskId === taskId &&
+        (existing?.subtaskId ?? undefined) === (subtaskId ?? undefined);
+      if (existing && sameExistingTarget && existing.pausedAt) {
         await db.timerState.update("active", {
           startedAt: nowISO(),
           pausedAt: undefined,
@@ -50,6 +58,7 @@ export function useTimer() {
       await db.timeEntries.add({
         id: entryId,
         taskId,
+        subtaskId,
         startAt: now,
         seconds: 0,
       });
@@ -59,6 +68,7 @@ export function useTimer() {
       await db.timerState.put({
         id: "active",
         taskId,
+        subtaskId,
         timeEntryId: entryId,
         startedAt: now,
         accumulatedSeconds: 0,
@@ -109,10 +119,31 @@ export function useTimer() {
 
     const task = await db.tasks.get(state.taskId);
     if (task) {
-      await db.tasks.update(state.taskId, {
-        actualSecondsTotal: task.actualSecondsTotal + totalSeconds,
-        updatedAt: now,
-      });
+      if (task.timeTrackingMode === "PROJECT" && state.subtaskId) {
+        const updatedSubtasks = task.subtasks.map((subtask) =>
+          subtask.id === state.subtaskId
+            ? { ...subtask, actualSecondsTotal: (subtask.actualSecondsTotal ?? 0) + totalSeconds }
+            : subtask
+        );
+        const hasSubtask = updatedSubtasks.some((subtask) => subtask.id === state.subtaskId);
+        if (hasSubtask) {
+          await db.tasks.update(state.taskId, {
+            subtasks: updatedSubtasks,
+            actualSecondsTotal: sumSubtaskActual(updatedSubtasks),
+            updatedAt: now,
+          });
+        } else {
+          await db.tasks.update(state.taskId, {
+            actualSecondsTotal: task.actualSecondsTotal + totalSeconds,
+            updatedAt: now,
+          });
+        }
+      } else {
+        await db.tasks.update(state.taskId, {
+          actualSecondsTotal: task.actualSecondsTotal + totalSeconds,
+          updatedAt: now,
+        });
+      }
     }
 
     await db.timerState.delete("active");
@@ -124,6 +155,7 @@ export function useTimer() {
     isRunning: !!timerState && !timerState.pausedAt,
     isPaused: !!timerState?.pausedAt,
     activeTaskId: timerState?.taskId ?? null,
+    activeSubtaskId: timerState?.subtaskId ?? null,
     startTimer,
     pauseTimer,
     stopTimer,

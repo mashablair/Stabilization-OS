@@ -1,7 +1,22 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, buildStabilizerStackSplit, getWaitingTasks, isActionable, markTaskDone, nowISO, unmarkTaskDone, getEffectiveMinutes, setDailyCapacity, clearDailyCapacity, todayDateStr } from "../db";
+import {
+  db,
+  buildStabilizerStackSplit,
+  getWaitingTasks,
+  isActionable,
+  markTaskDone,
+  nowISO,
+  unmarkTaskDone,
+  getEffectiveMinutes,
+  setDailyCapacity,
+  clearDailyCapacity,
+  todayDateStr,
+  getTaskActualSeconds,
+  getTaskEstimateMinutes,
+  isProjectMode,
+} from "../db";
 import type { TaskDomain } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
 import QuickEntryModal from "../components/QuickEntryModal";
@@ -36,6 +51,8 @@ export default function TodayPage() {
   const [waitingOpen, setWaitingOpen] = useState(false);
   const [doneOpen, setDoneOpen] = useState(true);
   const [capacityPopoverOpen, setCapacityPopoverOpen] = useState(false);
+  const [projectSubtaskByTaskId, setProjectSubtaskByTaskId] = useState<Record<string, string>>({});
+  const [subtaskPickerTaskId, setSubtaskPickerTaskId] = useState<string | null>(null);
   const timer = useTimer();
 
   const today = todayDateStr();
@@ -122,7 +139,7 @@ export default function TodayPage() {
   const todayTasks = tab === "Life" ? stabilizerTasks : builderActionable;
 
   const allocatedMins = todayTasks.reduce(
-    (s, t) => s + (t.estimateMinutes ?? 0),
+    (s, t) => s + getTaskEstimateMinutes(t),
     0
   );
   const usedMins = spentMins + allocatedMins;
@@ -142,6 +159,21 @@ export default function TodayPage() {
 
   const closeCpPopoverOnTabSwitch = () => setCapacityPopoverOpen(false);
   const catMap = new Map(categories.map((c) => [c.id, c]));
+  const getSelectedProjectSubtask = (task: (typeof allTasks)[0]) => {
+    if (!isProjectMode(task)) return undefined;
+    if (timer.activeTaskId === task.id && timer.activeSubtaskId) {
+      return task.subtasks.find((subtask) => subtask.id === timer.activeSubtaskId);
+    }
+    const selectedId = projectSubtaskByTaskId[task.id];
+    return (
+      task.subtasks.find((subtask) => subtask.id === selectedId) ??
+      task.subtasks[0]
+    );
+  };
+
+  const setSelectedProjectSubtask = (taskId: string, subtaskId: string) => {
+    setProjectSubtaskByTaskId((prev) => ({ ...prev, [taskId]: subtaskId }));
+  };
 
   const makeActionable = async (taskId: string) => {
     await db.tasks.update(taskId, {
@@ -168,9 +200,12 @@ export default function TodayPage() {
     showPinActions = true
   ) => {
     const cat = catMap.get(task.categoryId);
+    const projectTask = isProjectMode(task);
+    const selectedProjectSubtask = getSelectedProjectSubtask(task);
     const isActive = timer.activeTaskId === task.id;
     const isRunning = isActive && timer.isRunning;
     const canPin = !stackFull && !isPinned;
+    const displayEstimate = getTaskEstimateMinutes(task);
 
     return (
       <div
@@ -223,11 +258,11 @@ export default function TodayPage() {
             {isActive ? (
               <span className="text-gradient font-mono font-bold text-lg">
                 {formatTime(timer.elapsed)}
-                {task.estimateMinutes ? ` / ${formatTime(task.estimateMinutes * 60)}` : ""}
+                {displayEstimate ? ` / ${formatTime(displayEstimate * 60)}` : ""}
               </span>
             ) : (
               <span className="text-slate-400 font-mono text-sm">
-                {task.estimateMinutes ? formatMinutes(task.estimateMinutes) : "—"}
+                {displayEstimate ? formatMinutes(displayEstimate) : "—"}
               </span>
             )}
           </div>
@@ -251,50 +286,95 @@ export default function TodayPage() {
           <div className="mb-4 flex items-center gap-2 text-xs text-slate-400">
             <span className="material-symbols-outlined text-sm">checklist</span>
             {task.subtasks.filter((s) => s.done).length}/{task.subtasks.length} subtasks
+            {projectTask && selectedProjectSubtask && (
+              <span className="ml-2 text-primary truncate">Tracking: {selectedProjectSubtask.title}</span>
+            )}
           </div>
         )}
 
-        <div className="flex items-center gap-3">
-          {isRunning ? (
-            <>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3">
+            {isRunning ? (
+              <>
+                <button
+                  onClick={() => timer.pauseTimer()}
+                  className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+                >
+                  <span className="material-symbols-outlined">pause</span>
+                  Pause
+                </button>
+                <button
+                  onClick={() => timer.stopTimer()}
+                  className="size-12 flex items-center justify-center border-2 border-slate-200 dark:border-border-dark rounded-xl text-slate-400 hover:text-red-500 hover:border-red-500/50 transition-all"
+                >
+                  <span className="material-symbols-outlined">stop</span>
+                </button>
+              </>
+            ) : isActive && timer.isPaused ? (
+              <>
+                <button
+                  onClick={() =>
+                    timer.startTimer(
+                      task.id,
+                      projectTask ? timer.activeSubtaskId ?? selectedProjectSubtask?.id : undefined
+                    )
+                  }
+                  className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+                >
+                  <span className="material-symbols-outlined">play_arrow</span>
+                  Resume
+                </button>
+                <button
+                  onClick={() => timer.stopTimer()}
+                  className="size-12 flex items-center justify-center border-2 border-slate-200 dark:border-border-dark rounded-xl text-slate-400 hover:text-red-500 hover:border-red-500/50 transition-all"
+                >
+                  <span className="material-symbols-outlined">stop</span>
+                </button>
+              </>
+            ) : (
               <button
-                onClick={() => timer.pauseTimer()}
-                className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
-              >
-                <span className="material-symbols-outlined">pause</span>
-                Pause
-              </button>
-              <button
-                onClick={() => timer.stopTimer()}
-                className="size-12 flex items-center justify-center border-2 border-slate-200 dark:border-border-dark rounded-xl text-slate-400 hover:text-red-500 hover:border-red-500/50 transition-all"
-              >
-                <span className="material-symbols-outlined">stop</span>
-              </button>
-            </>
-          ) : isActive && timer.isPaused ? (
-            <>
-              <button
-                onClick={() => timer.startTimer(task.id)}
-                className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+                onClick={() => timer.startTimer(task.id, projectTask ? selectedProjectSubtask?.id : undefined)}
+                disabled={projectTask && !selectedProjectSubtask}
+                className="flex-1 border-2 border-primary text-primary hover:bg-gradient-accent hover:text-white hover:border-transparent font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined">play_arrow</span>
-                Resume
+                Start
               </button>
+            )}
+          </div>
+          {projectTask && task.subtasks.length > 1 && (
+            <div className="flex flex-col items-start gap-1">
               <button
-                onClick={() => timer.stopTimer()}
-                className="size-12 flex items-center justify-center border-2 border-slate-200 dark:border-border-dark rounded-xl text-slate-400 hover:text-red-500 hover:border-red-500/50 transition-all"
+                type="button"
+                onClick={() =>
+                  setSubtaskPickerTaskId((current) => (current === task.id ? null : task.id))
+                }
+                className="text-xs text-primary hover:underline"
               >
-                <span className="material-symbols-outlined">stop</span>
+                Change subtask
               </button>
-            </>
-          ) : (
-            <button
-              onClick={() => timer.startTimer(task.id)}
-              className="flex-1 border-2 border-primary text-primary hover:bg-gradient-accent hover:text-white hover:border-transparent font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-all"
-            >
-              <span className="material-symbols-outlined">play_arrow</span>
-              Start
-            </button>
+              {subtaskPickerTaskId === task.id && (
+                <div className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-2 space-y-1">
+                  {task.subtasks.map((subtask) => (
+                    <button
+                      key={subtask.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProjectSubtask(task.id, subtask.id);
+                        setSubtaskPickerTaskId(null);
+                      }}
+                      className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                        selectedProjectSubtask?.id === subtask.id
+                          ? "bg-primary/10 text-primary font-semibold"
+                          : "hover:bg-white dark:hover:bg-slate-700/50"
+                      }`}
+                    >
+                      {subtask.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -601,8 +681,8 @@ export default function TodayPage() {
                                 {cat.name}
                               </span>
                             )}
-                            {task.actualSecondsTotal > 0 && (
-                              <span>{formatMinutes(Math.round(task.actualSecondsTotal / 60))}</span>
+                            {getTaskActualSeconds(task) > 0 && (
+                              <span>{formatMinutes(Math.round(getTaskActualSeconds(task) / 60))}</span>
                             )}
                           </div>
                         </Link>
