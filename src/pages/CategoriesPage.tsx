@@ -269,7 +269,7 @@ export default function CategoriesPage() {
           </div>
           <Link
             to="/"
-            className="bg-gradient-accent text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform whitespace-nowrap"
+            className="border border-primary/10 text-primary px-6 py-3 rounded-lg font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform whitespace-nowrap"
           >
             View Today Stack
           </Link>
