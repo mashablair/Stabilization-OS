@@ -48,7 +48,10 @@ export default function TaskDetailPage() {
   const [editingSubtaskTitle, setEditingSubtaskTitle] = useState("");
   const [addTimeInput, setAddTimeInput] = useState("");
   const [selectedSubtaskId, setSelectedSubtaskId] = useState<string | null>(null);
-  const [projectModeNotice, setProjectModeNotice] = useState<string | null>(null);
+  const [projectModeNotice, setProjectModeNotice] = useState<
+    { variant: "captured" | "switched"; estimate: string; actual: string } | null
+  >(null);
+  const [modeSwitchConfirm, setModeSwitchConfirm] = useState<"toProject" | "toTask" | null>(null);
 
   useEffect(() => {
     setIsEditingTitle(false);
@@ -57,6 +60,7 @@ export default function TaskDetailPage() {
     setEditingSubtaskTitle("");
     setSelectedSubtaskId(null);
     setProjectModeNotice(null);
+    setModeSwitchConfirm(null);
   }, [id]);
 
   useEffect(() => {
@@ -186,6 +190,8 @@ export default function TaskDetailPage() {
 
     const capturedEstimate = formatMinutes(task.estimateMinutes ?? 0);
     const capturedActual = formatMinutes(Math.round(task.actualSecondsTotal / 60));
+    await db.timeEntries.where("taskId").equals(task.id).delete();
+
     const updatedSubtasks = task.subtasks.map((subtask) => ({
       ...subtask,
       actualSecondsTotal: subtask.actualSecondsTotal ?? 0,
@@ -198,9 +204,12 @@ export default function TaskDetailPage() {
       actualSecondsTotal: sumSubtaskActual(updatedSubtasks),
     });
     setSelectedSubtaskId(updatedSubtasks[0]?.id ?? null);
-    setProjectModeNotice(
-      `Captured before switch: estimate ${capturedEstimate}, actual ${capturedActual}. You can now estimate and track time per subtask.`
-    );
+    setModeSwitchConfirm(null);
+    setProjectModeNotice({
+      variant: "captured",
+      estimate: capturedEstimate,
+      actual: capturedActual,
+    });
   };
 
   const switchToTaskMode = async () => {
@@ -208,17 +217,31 @@ export default function TaskDetailPage() {
     if (timer.activeTaskId === task.id) {
       await timer.stopTimer();
     }
-    const totalEstimate = sumSubtaskEstimate(task.subtasks);
-    const totalActual = sumSubtaskActual(task.subtasks);
+    const freshTask = await db.tasks.get(task.id);
+    if (!freshTask) return;
+    let totalEstimate = sumSubtaskEstimate(freshTask.subtasks);
+    let totalActual = sumSubtaskActual(freshTask.subtasks);
+    if (totalActual === 0 && timeEntries.length > 0) {
+      totalActual = timeEntries
+        .filter((e) => e.endAt)
+        .reduce((sum, e) => sum + e.seconds, 0);
+    }
+    if (totalEstimate === 0 && (freshTask.estimateMinutes ?? 0) > 0) {
+      totalEstimate = freshTask.estimateMinutes!;
+    }
+    await db.timeEntries.where("taskId").equals(task.id).delete();
     await update({
       timeTrackingMode: "TASK",
       estimateMinutes: totalEstimate || undefined,
       actualSecondsTotal: totalActual,
-      subtasks: stripSubtaskTimeFields(task.subtasks),
+      subtasks: stripSubtaskTimeFields(freshTask.subtasks),
     });
-    setProjectModeNotice(
-      `Switched to regular mode. Totals applied: estimate ${formatMinutes(totalEstimate)}, actual ${formatMinutes(Math.round(totalActual / 60))}.`
-    );
+    setModeSwitchConfirm(null);
+    setProjectModeNotice({
+      variant: "switched",
+      estimate: formatMinutes(totalEstimate),
+      actual: formatMinutes(Math.round(totalActual / 60)),
+    });
   };
 
   const deleteTask = async () => {
@@ -422,20 +445,6 @@ export default function TaskDetailPage() {
               </select>
             </div>
           </div>
-
-          {projectModeNotice && (
-            <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-slate-700 dark:text-slate-200 flex items-start justify-between gap-3">
-              <p>{projectModeNotice}</p>
-              <button
-                type="button"
-                onClick={() => setProjectModeNotice(null)}
-                className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                title="Dismiss message"
-              >
-                <span className="material-symbols-outlined text-base">close</span>
-              </button>
-            </div>
-          )}
 
           {/* Context Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -685,6 +694,25 @@ export default function TaskDetailPage() {
           ) : (
             /* Focus Timer — shown for all non-PENDING statuses */
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-8 flex flex-col items-center gap-4">
+              {projectModeNotice && (
+                <div className="w-full rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 flex items-center justify-between gap-2">
+                  <span>
+                    {projectModeNotice.variant === "captured" ? (
+                      <>Captured before switch: estimate <strong>{projectModeNotice.estimate}</strong>, actual <strong>{projectModeNotice.actual}</strong>. You can now estimate and track time per subtask.</>
+                    ) : (
+                      <>Switched to regular mode. Totals applied: estimate <strong>{projectModeNotice.estimate}</strong>, actual <strong>{projectModeNotice.actual}</strong>.</>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setProjectModeNotice(null)}
+                    className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    title="Dismiss"
+                  >
+                    <span className="material-symbols-outlined text-sm">close</span>
+                  </button>
+                </div>
+              )}
               <div className="text-slate-400 text-xs font-bold uppercase tracking-widest">
                 {isProjectTask ? `Subtask Timer` : "Timer"}
               </div>
@@ -813,7 +841,7 @@ export default function TaskDetailPage() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={switchToTaskMode}
+                  onClick={() => isProjectTask && setModeSwitchConfirm("toTask")}
                   className={`flex-1 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${
                     !isProjectTask
                       ? "bg-primary/10 text-primary border-primary"
@@ -824,7 +852,7 @@ export default function TaskDetailPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={switchToProjectMode}
+                  onClick={() => !isProjectTask && canEnableProjectMode && setModeSwitchConfirm("toProject")}
                   disabled={!canEnableProjectMode}
                   className={`flex-1 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${
                     isProjectTask
@@ -969,6 +997,79 @@ export default function TaskDetailPage() {
           </button>
         </div>
       </div>
+
+      {modeSwitchConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-6 flex flex-col gap-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold tracking-tight">
+                  Switch to {modeSwitchConfirm === "toProject" ? "Project" : "Regular Task"} Mode?
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setModeSwitchConfirm(null)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Session history (individual time entries) will be cleared. Your totals will be preserved as the following:
+              </p>
+
+              <div className="rounded-xl bg-slate-100 dark:bg-slate-800 px-4 py-3 text-sm">
+                {modeSwitchConfirm === "toProject" ? (
+                  <>
+                    <span className="text-slate-600 dark:text-slate-400">Current totals: </span>
+                    <strong>estimate {formatMinutes(task.estimateMinutes ?? 0)}</strong>
+                    <span className="text-slate-600 dark:text-slate-400">, </span>
+                    <strong>actual {formatMinutes(Math.round(task.actualSecondsTotal / 60))}</strong>
+                  </>
+                ) : (
+                  (() => {
+                    const freshTask = task;
+                    let est = sumSubtaskEstimate(freshTask.subtasks);
+                    let act = sumSubtaskActual(freshTask.subtasks);
+                    if (act === 0 && timeEntries.length > 0) {
+                      act = timeEntries.filter((e) => e.endAt).reduce((s, e) => s + e.seconds, 0);
+                    }
+                    if (est === 0 && (freshTask.estimateMinutes ?? 0) > 0) {
+                      est = freshTask.estimateMinutes!;
+                    }
+                    return (
+                      <>
+                        <span className="text-slate-600 dark:text-slate-400">Totals to apply: </span>
+                        <strong>estimate {formatMinutes(est)}</strong>
+                        <span className="text-slate-600 dark:text-slate-400">, </span>
+                        <strong>actual {formatMinutes(Math.round(act / 60))}</strong>
+                      </>
+                    );
+                  })()
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setModeSwitchConfirm(null)}
+                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => (modeSwitchConfirm === "toProject" ? switchToProjectMode() : switchToTaskMode())}
+                  className="flex-1 bg-gradient-accent text-white font-bold py-3 rounded-xl shadow-lg shadow-primary/20 hover:opacity-90 transition-all"
+                >
+                  Switch
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
