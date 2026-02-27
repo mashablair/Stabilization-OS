@@ -20,6 +20,7 @@ import {
 import type { TaskDomain } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
 import QuickEntryModal from "../components/QuickEntryModal";
+import LogTaskModal from "../components/LogTaskModal";
 import AllTasksDrawer from "../components/AllTasksDrawer";
 import CapacityAdjustPopover from "../components/CapacityAdjustPopover";
 type Tab = "Life" | "Builder";
@@ -46,6 +47,7 @@ export default function TodayPage() {
   const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
   const allTasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
   const [showModal, setShowModal] = useState(false);
+  const [showLogTaskModal, setShowLogTaskModal] = useState(false);
   const [showAllTasksDrawer, setShowAllTasksDrawer] = useState(false);
   const [tab, setTab] = useState<Tab>("Life");
   const [waitingOpen, setWaitingOpen] = useState(false);
@@ -523,6 +525,14 @@ export default function TodayPage() {
                   <span className="hidden md:inline">All tasks</span>
                 </button>
                 <button
+                  onClick={() => setShowLogTaskModal(true)}
+                  className="text-slate-600 dark:text-slate-400 text-sm font-semibold flex items-center gap-1 hover:text-primary transition-colors"
+                  title="Log Task"
+                >
+                  <span className="material-symbols-outlined text-sm">history_edu</span>
+                  <span className="hidden md:inline">Log Task</span>
+                </button>
+                <button
                   onClick={() => setShowModal(true)}
                   className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
                   title="Add Task"
@@ -780,6 +790,13 @@ export default function TodayPage() {
         onClose={() => setShowModal(false)}
         defaultDomain={tab === "Builder" ? "BUSINESS" : "LIFE_ADMIN"}
         addToTodayStack={tab === "Life"}
+      />
+
+      <LogTaskModal
+        open={showLogTaskModal}
+        onClose={() => setShowLogTaskModal(false)}
+        defaultDomain={tab === "Builder" ? "BUSINESS" : "LIFE_ADMIN"}
+        defaultDate={today}
       />
 
       <AllTasksDrawer

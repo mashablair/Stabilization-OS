@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, buildStabilizerStackSplit, isActionable, nowISO, getEffectiveMinutes, todayDateStr } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
 import type { Task } from "../db";
+import LogTaskModal from "./LogTaskModal";
 
 type Tab = "Life" | "Builder";
 
@@ -71,22 +73,33 @@ export default function AllTasksView({ tab, embedded = false, onClose }: Props) 
   };
 
   const isPinned = (task: Task) => task.status === "TODAY";
+  const [showLogTaskModal, setShowLogTaskModal] = useState(false);
 
   return (
     <div className={`flex flex-col ${embedded ? "gap-4" : "gap-6"}`}>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h2 className="text-xl font-bold leading-tight">
           All {tab === "Life" ? "Life" : "Business"} Tasks
         </h2>
-        {embedded && onClose && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={onClose}
-            className="p-2 -m-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            aria-label="Close"
+            onClick={() => setShowLogTaskModal(true)}
+            className="text-slate-600 dark:text-slate-400 text-sm font-semibold flex items-center gap-1 hover:text-primary transition-colors"
+            title="Log Task"
           >
-            <span className="material-symbols-outlined">close</span>
+            <span className="material-symbols-outlined text-sm">history_edu</span>
+            Log Task
           </button>
-        )}
+          {embedded && onClose && (
+            <button
+              onClick={onClose}
+              className="p-2 -m-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              aria-label="Close"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -158,6 +171,13 @@ export default function AllTasksView({ tab, embedded = false, onClose }: Props) 
           })
         )}
       </div>
+
+      <LogTaskModal
+        open={showLogTaskModal}
+        onClose={() => setShowLogTaskModal(false)}
+        defaultDomain={tab === "Life" ? "LIFE_ADMIN" : "BUSINESS"}
+        defaultDate={today}
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
 } from "../db";
 import type { Task } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
+import LogTaskModal from "../components/LogTaskModal";
 
 type DomainTab = "Life" | "Builder";
 type DoneTab = "Completed" | "Archived";
@@ -54,6 +55,7 @@ export default function AllTasksPage() {
   const [doneOpen, setDoneOpen] = useState(false);
   const [doneTab, setDoneTab] = useState<DoneTab>("Completed");
   const [pendingOpen, setPendingOpen] = useState(false);
+  const [showLogTaskModal, setShowLogTaskModal] = useState(false);
 
   const domain = domainTab === "Life" ? "LIFE_ADMIN" : "BUSINESS";
   const actionableTasks = allTasks.filter(
@@ -149,15 +151,25 @@ export default function AllTasksPage() {
 
       {/* Active tasks */}
       <div className="flex flex-col gap-6">
-        <div>
-          <h2 className="text-xl font-bold leading-tight">
-            All {domainTab === "Life" ? "Life" : "Business"} Tasks
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            {domainTab === "Life"
-              ? "Pin tasks to add them to your Today Stack. Unpin to remove."
-              : "Pin tasks to prioritize them at the top of your Builder Queue."}
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold leading-tight">
+              All {domainTab === "Life" ? "Life" : "Business"} Tasks
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              {domainTab === "Life"
+                ? "Pin tasks to add them to your Today Stack. Unpin to remove."
+                : "Pin tasks to prioritize them at the top of your Builder Queue."}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowLogTaskModal(true)}
+            className="shrink-0 text-slate-600 dark:text-slate-400 text-sm font-semibold flex items-center gap-1 hover:text-primary transition-colors"
+            title="Log Task"
+          >
+            <span className="material-symbols-outlined text-sm">history_edu</span>
+            Log Task
+          </button>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -416,6 +428,13 @@ export default function AllTasksPage() {
           )}
         </div>
       )}
+
+      <LogTaskModal
+        open={showLogTaskModal}
+        onClose={() => setShowLogTaskModal(false)}
+        defaultDomain={domain}
+        defaultDate={today}
+      />
     </div>
   );
 }
