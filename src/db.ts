@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
+import type { Habit, HabitLog, HabitLogStatus } from "./habits";
 
 export type TaskDomain = "LIFE_ADMIN" | "BUSINESS";
 export type LifeAdminCategoryKind = "LEGAL" | "MONEY" | "MAINTENANCE" | "CAREGIVER";
@@ -117,6 +118,8 @@ const db = new Dexie("StabilizationOS") as Dexie & {
   appSettings: EntityTable<AppSettings, "id">;
   dailyCapacity: EntityTable<DailyCapacity, "id">;
   wins: EntityTable<Win, "id">;
+  habits: EntityTable<Habit, "id">;
+  habitLogs: EntityTable<HabitLog, "id">;
 };
 
 db.version(1).stores({
@@ -207,6 +210,19 @@ db.version(5).stores({
   });
 });
 
+db.version(6).stores({
+  categories: "id, kind, domain",
+  tasks: "id, categoryId, status, priority, domain",
+  timeEntries: "id, taskId",
+  weeklyReviews: "id, weekStart",
+  timerState: "id",
+  appSettings: "id",
+  dailyCapacity: "id, [date+domain]",
+  wins: "id, date, createdAt",
+  habits: "id, archivedAt, sortOrder, showInToday",
+  habitLogs: "id, habitId, date, [habitId+date], status",
+});
+
 export { db };
 
 export function generateId(): string {
@@ -257,6 +273,41 @@ export async function clearDailyCapacity(domain: TaskDomain): Promise<void> {
   if (existing) {
     await db.dailyCapacity.delete(existing.id);
   }
+}
+
+export async function upsertHabitLog(
+  habitId: string,
+  date: string,
+  updates: {
+    status: HabitLogStatus;
+    value?: number;
+    note?: string;
+  }
+): Promise<void> {
+  const existing = await db.habitLogs
+    .where("[habitId+date]")
+    .equals([habitId, date])
+    .first();
+  const now = nowISO();
+  if (existing) {
+    await db.habitLogs.update(existing.id, {
+      status: updates.status,
+      value: updates.value,
+      note: updates.note,
+      updatedAt: now,
+    });
+    return;
+  }
+  await db.habitLogs.add({
+    id: generateId(),
+    habitId,
+    date,
+    status: updates.status,
+    value: updates.value,
+    note: updates.note,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
 // --- Waiting / actionable helpers ---

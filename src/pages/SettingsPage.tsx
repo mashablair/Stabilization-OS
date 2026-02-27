@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, type Category, type Task, type TimeEntry, type WeeklyReview, type DailyCapacity, type AppSettings } from "../db";
+import type { Habit, HabitLog } from "../habits";
 
 interface ShareBundle {
   meta: { version: string; exportedAt: string; timezone: string };
@@ -9,6 +10,8 @@ interface ShareBundle {
   timeEntries: TimeEntry[];
   weeklyReviews?: WeeklyReview[];
   dailyCapacity?: DailyCapacity[];
+  habits?: Habit[];
+  habitLogs?: HabitLog[];
   appSettings?: AppSettings;
 }
 
@@ -38,6 +41,8 @@ export default function SettingsPage() {
     const timeEntries = await db.timeEntries.toArray();
     const weeklyReviews = await db.weeklyReviews.toArray();
     const dailyCapacity = await db.dailyCapacity.toArray();
+    const habits = await db.habits.toArray();
+    const habitLogs = await db.habitLogs.toArray();
     const appSettings = await db.appSettings.get("default");
 
     const bundle: ShareBundle = {
@@ -51,6 +56,8 @@ export default function SettingsPage() {
       timeEntries,
       weeklyReviews,
       dailyCapacity,
+      habits,
+      habitLogs,
       appSettings: appSettings ?? undefined,
     };
 
@@ -80,13 +87,24 @@ export default function SettingsPage() {
 
       await db.transaction(
         "rw",
-        [db.categories, db.tasks, db.timeEntries, db.weeklyReviews, db.dailyCapacity, db.appSettings],
+        [
+          db.categories,
+          db.tasks,
+          db.timeEntries,
+          db.weeklyReviews,
+          db.dailyCapacity,
+          db.habits,
+          db.habitLogs,
+          db.appSettings,
+        ],
         async () => {
           await db.categories.clear();
           await db.tasks.clear();
           await db.timeEntries.clear();
           await db.weeklyReviews.clear();
           await db.dailyCapacity.clear();
+          await db.habits.clear();
+          await db.habitLogs.clear();
 
           await db.categories.bulkAdd(bundle.categories);
           await db.tasks.bulkAdd(bundle.tasks);
@@ -97,6 +115,12 @@ export default function SettingsPage() {
           if (bundle.dailyCapacity) {
             await db.dailyCapacity.bulkAdd(bundle.dailyCapacity);
           }
+          if (bundle.habits) {
+            await db.habits.bulkAdd(bundle.habits);
+          }
+          if (bundle.habitLogs) {
+            await db.habitLogs.bulkAdd(bundle.habitLogs);
+          }
           if (bundle.appSettings) {
             await db.appSettings.put(bundle.appSettings);
           }
@@ -104,7 +128,7 @@ export default function SettingsPage() {
       );
 
       setImportStatus(
-        `Imported ${bundle.categories.length} categories, ${bundle.tasks.length} tasks, ${bundle.timeEntries.length} time entries.`
+        `Imported ${bundle.categories.length} categories, ${bundle.tasks.length} tasks, ${bundle.timeEntries.length} time entries, ${bundle.habits?.length ?? 0} habits, and ${bundle.habitLogs?.length ?? 0} habit logs.`
       );
     } catch (err) {
       setImportStatus(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
@@ -219,7 +243,7 @@ export default function SettingsPage() {
           <h3 className="font-bold text-lg mb-2">Export Share Bundle</h3>
           <p className="text-sm text-slate-500 mb-4">
             Download all your data as a JSON file. Includes categories, tasks,
-            time entries, and weekly reviews.
+            habits, habit logs, time entries, and weekly reviews.
           </p>
           <button
             onClick={exportBundle}

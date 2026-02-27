@@ -24,6 +24,7 @@ const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: "grid_view" },
   { to: "/review", label: "Review", icon: "rate_review" },
   { to: "/wins", label: "Wins", icon: "emoji_events" },
+  { to: "/habits", label: "Habits", icon: "check_circle" },
 ];
 
 export default function Layout() {
