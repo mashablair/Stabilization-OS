@@ -464,15 +464,15 @@ export default function TaskDetailPage() {
             </div>
             <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-md border-2 border-primary/30">
               <div className="flex items-center gap-2 mb-3">
-                <span className="material-symbols-outlined text-xl text-gradient">play_circle</span>
-                <h3 className="text-xs font-bold uppercase tracking-widest text-gradient">Next Micro-step</h3>
+                <span className="material-symbols-outlined text-xl text-gradient">report_problem</span>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-gradient">Friction Note</h3>
               </div>
               <textarea
                 className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm font-semibold resize-none min-h-[80px] focus:outline-none"
-                placeholder="The absolute smallest step..."
-                value={task.contextCard.nextMicroStep}
+                placeholder="What's making this hard?"
+                value={task.frictionNote ?? ""}
                 onChange={(e) =>
-                  update({ contextCard: { ...task.contextCard, nextMicroStep: e.target.value } })
+                  update({ frictionNote: e.target.value })
                 }
               />
             </div>
@@ -928,18 +928,6 @@ export default function TaskDetailPage() {
                   onChange={(e) => update({ moneyImpact: Number(e.target.value) || undefined })}
                 />
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-                Friction Note
-              </label>
-              <input
-                className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 h-12 text-sm"
-                placeholder="What's making this hard?"
-                value={task.frictionNote ?? ""}
-                onChange={(e) => update({ frictionNote: e.target.value })}
-              />
             </div>
 
             <div>
