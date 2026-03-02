@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, generateId, nowISO, todayDateStr, upsertHabitLog } from "../db";
 import {
@@ -14,8 +14,24 @@ import {
   type HabitType,
 } from "../habits";
 
-const HABIT_COLORS = ["#22c55e", "#3b82f6", "#a855f7", "#f97316", "#eab308", "#ec4899", "#14b8a6", "#64748b"];
-const HABIT_ICONS = ["favorite", "fitness_center", "menu_book", "self_improvement", "water_drop", "schedule", "directions_walk", "bedtime"];
+const HABIT_COLORS: string[] = [
+  "#22c55e", "#3b82f6", "#a855f7", "#f97316", "#eab308", "#ec4899", "#14b8a6", "#64748b",
+  "#ef4444", "#8b5cf6", "#06b6d4", "#84cc16", "#f43f5e", "#0ea5e9", "#f59e0b", "#10b981",
+  "#6366f1", "#d946ef", "#22d3ee", "#a3e635", "#fb7185", "#38bdf8", "#fbbf24", "#34d399",
+  "#818cf8", "#e879f9", "#67e8f9", "#bef264", "#f472b6", "#7dd3fc", "#fcd34d", "#6ee7b7",
+  "#a78bfa", "#c084fc", "#5eead4", "#d9f99d", "#f9a8d4", "#bae6fd", "#fde68a", "#a7f3d0",
+  "#c4b5fd", "#e9d5ff", "#99f6e4", "#ecfccb", "#fbcfe8", "#e0f2fe", "#fef3c7", "#d1fae5",
+  "#a855f7", "#ec4899",
+];
+
+const HABIT_ICONS: string[] = [
+  "favorite", "fitness_center", "menu_book", "self_improvement", "water_drop", "schedule", "directions_walk", "bedtime",
+  "local_florist", "restaurant", "coffee", "nightlight", "star", "bolt", "spa", "pool", "sports_gymnastics",
+  "hiking", "psychology", "school", "auto_stories", "science", "code", "computer", "eco",
+  "shower", "kitchen", "cleaning_services", "home_repair_service", "grass", "terrain", "recycling", "energy_savings_leaf",
+  "music_note", "headphones", "brush", "palette", "draw", "edit_note", "task_alt", "check_circle", "add_circle",
+  "timer", "alarm", "event", "today", "trending_up", "insights", "bar_chart", "pie_chart",
+];
 
 type DayEditorState = { open: boolean; date: string };
 
@@ -114,7 +130,7 @@ export default function HabitsPage() {
             onClick={() => setShowEdit(true)}
             className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
-            Edit habits
+            Manage habits
           </button>
           <button
             type="button"
@@ -152,13 +168,21 @@ export default function HabitsPage() {
                       </span>
                       <p className="font-semibold truncate">{habit.name}</p>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setStatus(habit, today, "DONE")}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${log?.status === "DONE" ? "bg-green-100 dark:bg-green-900/40 border-green-400 text-green-700 dark:text-green-300" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                        onClick={() => setStatus(habit, today, log?.status === "DONE" ? "NONE" : "DONE")}
+                        className={`size-7 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
+                          log?.status === "DONE"
+                            ? "border-transparent text-white shadow-md"
+                            : "border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500"
+                        }`}
+                        style={log?.status === "DONE" ? { background: habit.color ?? "#22c55e" } : undefined}
+                        title={log?.status === "DONE" ? "Uncheck to clear" : "Mark done"}
                       >
-                        Done
+                        {log?.status === "DONE" ? (
+                          <span className="material-symbols-outlined text-base font-bold">check</span>
+                        ) : null}
                       </button>
                       {habit.allowPartial && (
                         <button
@@ -178,14 +202,6 @@ export default function HabitsPage() {
                           Skip
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setStatus(habit, today, "NONE")}
-                        className="px-2 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
-                        title="Clear"
-                      >
-                        Clear
-                      </button>
                     </div>
                   </div>
                   {habit.type !== "CHECK" && (
@@ -356,7 +372,7 @@ export default function HabitsPage() {
         onClose={() => setShowAdd(false)}
         existingCount={activeHabits.length}
       />
-      <EditHabitsModal
+      <ManageHabitsModal
         open={showEdit}
         onClose={() => setShowEdit(false)}
         habits={habits}
@@ -408,6 +424,8 @@ function AddHabitModal({
   const [startDate, setStartDate] = useState(todayDateStr());
   const [color, setColor] = useState(HABIT_COLORS[0]);
   const [icon, setIcon] = useState(HABIT_ICONS[0]);
+  const [showCustomColor, setShowCustomColor] = useState(false);
+  const [showCustomIcon, setShowCustomIcon] = useState(false);
 
   if (!open) return null;
 
@@ -443,7 +461,7 @@ function AddHabitModal({
   };
 
   return (
-    <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="max-w-2xl mx-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">Add Habit</h2>
@@ -452,180 +470,43 @@ function AddHabitModal({
           </button>
         </div>
 
-        <div className="space-y-4">
-          <label className="block">
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Name</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
-              placeholder="e.g. Walk 8k steps"
-              autoFocus
-            />
-          </label>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <label className="block">
-              <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Type</span>
-              <select
-                value={type}
-                onChange={(e) => {
-                  const next = e.target.value as HabitType;
-                  setType(next);
-                  if (next !== "CHECK") setAllowPartial(true);
-                }}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
-              >
-                <option value="CHECK">Check</option>
-                <option value="COUNT">Count</option>
-                <option value="TIME">Time</option>
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Start date</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
-              />
-            </label>
-          </div>
-
-          <label className="block">
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Schedule</span>
-            <select
-              value={scheduleType}
-              onChange={(e) => setScheduleType(e.target.value as HabitScheduleType)}
-              className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
-            >
-              <option value="DAILY">Daily</option>
-              <option value="WEEKDAYS">Specific weekdays</option>
-              <option value="EVERY_N_DAYS">Every N days</option>
-              <option value="TIMES_PER_WEEK">X times per week</option>
-            </select>
-          </label>
-
-          {scheduleType === "WEEKDAYS" && (
-            <div className="flex flex-wrap gap-2">
-              {(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const).map((label, day) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => toggleWeekday(day)}
-                  className={`px-3 py-1.5 rounded-lg text-sm border ${weekdays.includes(day) ? "border-primary text-primary bg-primary/10" : "border-slate-200 dark:border-slate-700"}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {scheduleType === "EVERY_N_DAYS" && (
-            <label className="block">
-              <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Every N days</span>
-              <input
-                type="number"
-                min={1}
-                value={everyNDays}
-                onChange={(e) => setEveryNDays(Math.max(1, Number(e.target.value) || 1))}
-                className="mt-1.5 w-32 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
-              />
-            </label>
-          )}
-
-          {scheduleType === "TIMES_PER_WEEK" && (
-            <label className="block">
-              <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Times per week</span>
-              <input
-                type="number"
-                min={1}
-                max={7}
-                value={timesPerWeek}
-                onChange={(e) => setTimesPerWeek(Math.min(7, Math.max(1, Number(e.target.value) || 1)))}
-                className="mt-1.5 w-32 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
-              />
-            </label>
-          )}
-
-          {type !== "CHECK" && (
-            <div className="grid sm:grid-cols-2 gap-4">
-              <label className="block">
-                <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Goal (optional)</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={goalTarget}
-                  onChange={(e) => setGoalTarget(Math.max(1, Number(e.target.value) || 1))}
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Unit</span>
-                <input
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  placeholder={type === "TIME" ? "minutes" : "steps"}
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
-                />
-              </label>
-            </div>
-          )}
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={showInToday} onChange={(e) => setShowInToday(e.target.checked)} />
-              Show in Today
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={allowPartial}
-                disabled={type !== "CHECK"}
-                onChange={(e) => setAllowPartial(e.target.checked)}
-              />
-              Allow Partial (Check habits)
-            </label>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={allowSkip} onChange={(e) => setAllowSkip(e.target.checked)} />
-            Allow Skip
-          </label>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">Color</p>
-              <div className="flex flex-wrap gap-2">
-                {HABIT_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setColor(c)}
-                    className={`size-7 rounded-full border-2 ${color === c ? "border-slate-800 dark:border-slate-100" : "border-transparent"}`}
-                    style={{ background: c }}
-                    title={c}
-                  />
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">Icon</p>
-              <div className="flex flex-wrap gap-2">
-                {HABIT_ICONS.map((i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setIcon(i)}
-                    className={`size-8 rounded-lg border flex items-center justify-center ${icon === i ? "border-primary text-primary bg-primary/10" : "border-slate-200 dark:border-slate-700"}`}
-                  >
-                    <span className="material-symbols-outlined text-base">{i}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <HabitFormFields
+          name={name}
+          setName={setName}
+          type={type}
+          setType={(next) => {
+            setType(next);
+            if (next !== "CHECK") setAllowPartial(true);
+          }}
+          scheduleType={scheduleType}
+          setScheduleType={(v) => setScheduleType(v)}
+          weekdays={weekdays}
+          toggleWeekday={toggleWeekday}
+          everyNDays={everyNDays}
+          setEveryNDays={setEveryNDays}
+          timesPerWeek={timesPerWeek}
+          setTimesPerWeek={setTimesPerWeek}
+          goalTarget={goalTarget}
+          setGoalTarget={setGoalTarget}
+          unit={unit}
+          setUnit={setUnit}
+          showInToday={showInToday}
+          setShowInToday={setShowInToday}
+          allowPartial={allowPartial}
+          setAllowPartial={setAllowPartial}
+          allowSkip={allowSkip}
+          setAllowSkip={setAllowSkip}
+          startDate={startDate}
+          setStartDate={setStartDate}
+          color={color}
+          setColor={setColor}
+          icon={icon}
+          setIcon={setIcon}
+          showCustomColor={showCustomColor}
+          setShowCustomColor={setShowCustomColor}
+          showCustomIcon={showCustomIcon}
+          setShowCustomIcon={setShowCustomIcon}
+        />
 
         <div className="flex items-center justify-end gap-2">
           <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold">
@@ -640,7 +521,338 @@ function AddHabitModal({
   );
 }
 
-function EditHabitsModal({
+interface HabitFormFieldsProps {
+  name: string;
+  setName: (v: string) => void;
+  type: HabitType;
+  setType: (v: HabitType) => void;
+  scheduleType: HabitScheduleType;
+  setScheduleType: (v: HabitScheduleType) => void;
+  weekdays: number[];
+  toggleWeekday: (day: number) => void;
+  everyNDays: number;
+  setEveryNDays: (v: number) => void;
+  timesPerWeek: number;
+  setTimesPerWeek: (v: number) => void;
+  goalTarget: number;
+  setGoalTarget: (v: number) => void;
+  unit: string;
+  setUnit: (v: string) => void;
+  showInToday: boolean;
+  setShowInToday: (v: boolean) => void;
+  allowPartial: boolean;
+  setAllowPartial: (v: boolean) => void;
+  allowSkip: boolean;
+  setAllowSkip: (v: boolean) => void;
+  startDate: string;
+  setStartDate: (v: string) => void;
+  color: string;
+  setColor: (v: string) => void;
+  icon: string;
+  setIcon: (v: string) => void;
+  showCustomColor: boolean;
+  setShowCustomColor: (v: boolean) => void;
+  showCustomIcon: boolean;
+  setShowCustomIcon: (v: boolean) => void;
+}
+
+function HabitFormFields({
+  name,
+  setName,
+  type,
+  setType,
+  scheduleType,
+  setScheduleType,
+  weekdays,
+  toggleWeekday,
+  everyNDays,
+  setEveryNDays,
+  timesPerWeek,
+  setTimesPerWeek,
+  goalTarget,
+  setGoalTarget,
+  unit,
+  setUnit,
+  showInToday,
+  setShowInToday,
+  allowPartial,
+  setAllowPartial,
+  allowSkip,
+  setAllowSkip,
+  startDate,
+  setStartDate,
+  color,
+  setColor,
+  icon,
+  setIcon,
+  showCustomColor,
+  setShowCustomColor,
+  showCustomIcon,
+  setShowCustomIcon,
+}: HabitFormFieldsProps) {
+  const [showMoreColors, setShowMoreColors] = useState(false);
+  const [showMoreIcons, setShowMoreIcons] = useState(false);
+
+  useEffect(() => {
+    const colorIdx = HABIT_COLORS.indexOf(color);
+    if (colorIdx >= 10) setShowMoreColors(true);
+  }, [color]);
+
+  useEffect(() => {
+    const iconIdx = HABIT_ICONS.indexOf(icon);
+    if (iconIdx >= 10) setShowMoreIcons(true);
+  }, [icon]);
+
+  return (
+    <div className="space-y-4">
+      <label className="block">
+        <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Name</span>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
+          placeholder="e.g. Walk 8k steps"
+          autoFocus
+        />
+      </label>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <label className="block">
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Type</span>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value as HabitType)}
+            className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
+          >
+            <option value="CHECK">Check</option>
+            <option value="COUNT">Count</option>
+            <option value="TIME">Time</option>
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Start date</span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
+          />
+        </label>
+      </div>
+
+      <label className="block">
+        <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Schedule</span>
+        <select
+          value={scheduleType}
+          onChange={(e) => setScheduleType(e.target.value as HabitScheduleType)}
+          className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
+        >
+          <option value="DAILY">Daily</option>
+          <option value="WEEKDAYS">Specific weekdays</option>
+          <option value="EVERY_N_DAYS">Every N days</option>
+          <option value="TIMES_PER_WEEK">X times per week</option>
+        </select>
+      </label>
+
+      {scheduleType === "WEEKDAYS" && (
+        <div className="flex flex-wrap gap-2">
+          {(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const).map((label, day) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => toggleWeekday(day)}
+              className={`px-3 py-1.5 rounded-lg text-sm border ${weekdays.includes(day) ? "border-primary text-primary bg-primary/10" : "border-slate-200 dark:border-slate-700"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {scheduleType === "EVERY_N_DAYS" && (
+        <label className="block">
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Every N days</span>
+          <input
+            type="number"
+            min={1}
+            value={everyNDays}
+            onChange={(e) => setEveryNDays(Math.max(1, Number(e.target.value) || 1))}
+            className="mt-1.5 w-32 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
+          />
+        </label>
+      )}
+
+      {scheduleType === "TIMES_PER_WEEK" && (
+        <label className="block">
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Times per week</span>
+          <input
+            type="number"
+            min={1}
+            max={7}
+            value={timesPerWeek}
+            onChange={(e) => setTimesPerWeek(Math.min(7, Math.max(1, Number(e.target.value) || 1)))}
+            className="mt-1.5 w-32 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
+          />
+        </label>
+      )}
+
+      {type !== "CHECK" && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Goal (optional)</span>
+            <input
+              type="number"
+              min={1}
+              value={goalTarget}
+              onChange={(e) => setGoalTarget(Math.max(1, Number(e.target.value) || 1))}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Unit</span>
+            <input
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+              placeholder={type === "TIME" ? "minutes" : "steps"}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
+            />
+          </label>
+        </div>
+      )}
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={showInToday} onChange={(e) => setShowInToday(e.target.checked)} />
+          Show in Today
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={allowPartial}
+            disabled={type !== "CHECK"}
+            onChange={(e) => setAllowPartial(e.target.checked)}
+          />
+          Allow Partial (Check habits)
+        </label>
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={allowSkip} onChange={(e) => setAllowSkip(e.target.checked)} />
+        Allow Skip
+      </label>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">Color</p>
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex flex-wrap gap-1.5">
+              {(showMoreColors ? HABIT_COLORS : HABIT_COLORS.slice(0, 10)).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => {
+                    setColor(c);
+                    setShowCustomColor(false);
+                  }}
+                  className={`size-6 rounded-full border-2 shrink-0 ${color === c && !showCustomColor ? "border-slate-800 dark:border-slate-100 ring-2 ring-primary" : "border-transparent"}`}
+                  style={{ background: c }}
+                  title={c}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() => setShowCustomColor(true)}
+                className={`size-6 rounded-full border-2 shrink-0 flex items-center justify-center ${showCustomColor ? "border-primary bg-primary/10" : "border-dashed border-slate-300 dark:border-slate-600"}`}
+                title="Add custom color"
+              >
+                <span className="material-symbols-outlined text-sm">add</span>
+              </button>
+              {HABIT_COLORS.length > 10 && (
+                <button
+                  type="button"
+                  onClick={() => setShowMoreColors(!showMoreColors)}
+                  className="text-xs font-semibold text-primary hover:underline ml-1 self-center"
+                >
+                  {showMoreColors ? "less" : "more"}
+                </button>
+              )}
+            </div>
+          </div>
+          {showCustomColor && (
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="size-8 rounded border border-slate-200 dark:border-slate-700 cursor-pointer"
+              />
+              <input
+                type="text"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                placeholder="#hex"
+                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent px-3 py-1.5 text-sm"
+              />
+            </div>
+          )}
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">Icon</p>
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex flex-wrap gap-1.5">
+              {(showMoreIcons ? HABIT_ICONS : HABIT_ICONS.slice(0, 10)).map((i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setIcon(i);
+                    setShowCustomIcon(false);
+                  }}
+                  className={`size-8 rounded-lg border shrink-0 flex items-center justify-center ${icon === i && !showCustomIcon ? "border-primary text-primary bg-primary/10" : "border-slate-200 dark:border-slate-700"}`}
+                >
+                  <span className="material-symbols-outlined text-base">{i}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setShowCustomIcon(true)}
+                className={`size-8 rounded-lg border shrink-0 flex items-center justify-center ${showCustomIcon ? "border-primary bg-primary/10" : "border-dashed border-slate-300 dark:border-slate-600"}`}
+                title="Add custom icon"
+              >
+                <span className="material-symbols-outlined text-sm">add</span>
+              </button>
+              {HABIT_ICONS.length > 10 && (
+                <button
+                  type="button"
+                  onClick={() => setShowMoreIcons(!showMoreIcons)}
+                  className="text-xs font-semibold text-primary hover:underline ml-1 self-center"
+                >
+                  {showMoreIcons ? "less" : "more"}
+                </button>
+              )}
+            </div>
+          </div>
+          {showCustomIcon && (
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="text"
+                value={icon}
+                onChange={(e) => setIcon(e.target.value)}
+                placeholder="e.g. local_florist"
+                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent px-3 py-1.5 text-sm"
+              />
+              <span className="material-symbols-outlined text-2xl shrink-0" style={{ color: color || "#a855f7" }}>
+                {icon || "?"}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ManageHabitsModal({
   open,
   onClose,
   habits,
@@ -649,6 +861,8 @@ function EditHabitsModal({
   onClose: () => void;
   habits: Habit[];
 }) {
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+
   if (!open) return null;
 
   const active = habits.filter((h) => !h.archivedAt).sort((a, b) => a.sortOrder - b.sortOrder);
@@ -675,48 +889,206 @@ function EditHabitsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="max-w-2xl mx-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-6">
+    <>
+      <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="max-w-2xl mx-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">Manage Habits</h2>
+            <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Active (reorder + archive)</p>
+            {active.length === 0 && <p className="text-sm text-slate-500">No active habits.</p>}
+            {active.map((habit, idx) => (
+              <div key={habit.id} className="flex items-center justify-between gap-3 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="material-symbols-outlined text-base" style={{ color: habit.color ?? "#a855f7" }}>
+                    {habit.icon ?? "check_circle"}
+                  </span>
+                  <p className="font-semibold truncate">{habit.name}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingHabit(habit)}
+                    className="size-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:border-primary hover:text-primary"
+                    title="Edit habit"
+                  >
+                    <span className="material-symbols-outlined text-base">edit</span>
+                  </button>
+                  <button type="button" onClick={() => move(idx, -1)} className="size-8 rounded-lg border border-slate-200 dark:border-slate-700">↑</button>
+                  <button type="button" onClick={() => move(idx, 1)} className="size-8 rounded-lg border border-slate-200 dark:border-slate-700">↓</button>
+                  <button type="button" onClick={() => archive(habit)} className="px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 text-xs font-semibold">
+                    Archive
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Archived</p>
+            {archived.length === 0 && <p className="text-sm text-slate-500">No archived habits.</p>}
+            {archived.map((habit) => (
+              <div key={habit.id} className="flex items-center justify-between gap-3 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+                <p className="font-medium text-slate-500">{habit.name}</p>
+                <button type="button" onClick={() => restore(habit)} className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold">
+                  Restore
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <EditHabitModal
+        open={!!editingHabit}
+        habit={editingHabit}
+        onClose={() => setEditingHabit(null)}
+        onSaved={() => setEditingHabit(null)}
+      />
+    </>
+  );
+}
+
+function EditHabitModal({
+  open,
+  habit,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  habit: Habit | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [type, setType] = useState<HabitType>("CHECK");
+  const [scheduleType, setScheduleType] = useState<HabitScheduleType>("DAILY");
+  const [weekdays, setWeekdays] = useState<number[]>([1, 3, 5]);
+  const [everyNDays, setEveryNDays] = useState(2);
+  const [timesPerWeek, setTimesPerWeek] = useState(3);
+  const [goalTarget, setGoalTarget] = useState(1);
+  const [unit, setUnit] = useState("");
+  const [showInToday, setShowInToday] = useState(true);
+  const [allowPartial, setAllowPartial] = useState(false);
+  const [allowSkip, setAllowSkip] = useState(true);
+  const [startDate, setStartDate] = useState(todayDateStr());
+  const [color, setColor] = useState(HABIT_COLORS[0]);
+  const [icon, setIcon] = useState(HABIT_ICONS[0]);
+  const [showCustomColor, setShowCustomColor] = useState(false);
+  const [showCustomIcon, setShowCustomIcon] = useState(false);
+
+  useEffect(() => {
+    if (habit) {
+      setName(habit.name);
+      setType(habit.type);
+      setScheduleType(habit.scheduleType);
+      setWeekdays(habit.weekdays ?? [1, 3, 5]);
+      setEveryNDays(habit.everyNDays ?? 2);
+      setTimesPerWeek(habit.timesPerWeek ?? 3);
+      setGoalTarget(habit.goalTarget ?? 1);
+      setUnit(habit.unit ?? "");
+      setShowInToday(habit.showInToday);
+      setAllowPartial(habit.allowPartial);
+      setAllowSkip(habit.allowSkip);
+      setStartDate(habit.startDate);
+      const habitColor = habit.color ?? HABIT_COLORS[0];
+      const habitIcon = habit.icon ?? HABIT_ICONS[0];
+      setColor(HABIT_COLORS.includes(habitColor) ? habitColor : habitColor);
+      setIcon(HABIT_ICONS.includes(habitIcon) ? habitIcon : habitIcon);
+      setShowCustomColor(!!habit.color && !HABIT_COLORS.includes(habit.color));
+      setShowCustomIcon(!!habit.icon && !HABIT_ICONS.includes(habit.icon));
+    }
+  }, [habit?.id]);
+
+  if (!open || !habit) return null;
+
+  const submit = async () => {
+    if (!name.trim()) return;
+    const now = nowISO();
+    await db.habits.update(habit.id, {
+      name: name.trim(),
+      type,
+      scheduleType,
+      weekdays: scheduleType === "WEEKDAYS" ? weekdays : undefined,
+      everyNDays: scheduleType === "EVERY_N_DAYS" ? everyNDays : undefined,
+      timesPerWeek: scheduleType === "TIMES_PER_WEEK" ? timesPerWeek : undefined,
+      goalTarget: type === "CHECK" ? undefined : goalTarget,
+      unit: type === "CHECK" ? undefined : unit.trim() || undefined,
+      startDate,
+      showInToday,
+      allowPartial: type === "CHECK" ? allowPartial : true,
+      allowSkip,
+      color,
+      icon,
+      updatedAt: now,
+    });
+    onSaved();
+  };
+
+  const toggleWeekday = (day: number) => {
+    setWeekdays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort((a, b) => a - b)));
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="max-w-2xl mx-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">Edit Habits</h2>
+          <h2 className="text-xl font-bold">Edit Habit</h2>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
 
-        <div className="space-y-3">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Active (reorder + archive)</p>
-          {active.length === 0 && <p className="text-sm text-slate-500">No active habits.</p>}
-          {active.map((habit, idx) => (
-            <div key={habit.id} className="flex items-center justify-between gap-3 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="material-symbols-outlined text-base" style={{ color: habit.color ?? "#a855f7" }}>
-                  {habit.icon ?? "check_circle"}
-                </span>
-                <p className="font-semibold truncate">{habit.name}</p>
-              </div>
-              <div className="flex items-center gap-1">
-                <button type="button" onClick={() => move(idx, -1)} className="size-8 rounded-lg border border-slate-200 dark:border-slate-700">↑</button>
-                <button type="button" onClick={() => move(idx, 1)} className="size-8 rounded-lg border border-slate-200 dark:border-slate-700">↓</button>
-                <button type="button" onClick={() => archive(habit)} className="px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 text-xs font-semibold">
-                  Archive
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <HabitFormFields
+          name={name}
+          setName={setName}
+          type={type}
+          setType={(next) => {
+            setType(next);
+            if (next !== "CHECK") setAllowPartial(true);
+          }}
+          scheduleType={scheduleType}
+          setScheduleType={(v) => setScheduleType(v)}
+          weekdays={weekdays}
+          toggleWeekday={toggleWeekday}
+          everyNDays={everyNDays}
+          setEveryNDays={setEveryNDays}
+          timesPerWeek={timesPerWeek}
+          setTimesPerWeek={setTimesPerWeek}
+          goalTarget={goalTarget}
+          setGoalTarget={setGoalTarget}
+          unit={unit}
+          setUnit={setUnit}
+          showInToday={showInToday}
+          setShowInToday={setShowInToday}
+          allowPartial={allowPartial}
+          setAllowPartial={setAllowPartial}
+          allowSkip={allowSkip}
+          setAllowSkip={setAllowSkip}
+          startDate={startDate}
+          setStartDate={setStartDate}
+          color={color}
+          setColor={setColor}
+          icon={icon}
+          setIcon={setIcon}
+          showCustomColor={showCustomColor}
+          setShowCustomColor={setShowCustomColor}
+          showCustomIcon={showCustomIcon}
+          setShowCustomIcon={setShowCustomIcon}
+        />
 
-        <div className="space-y-3">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Archived</p>
-          {archived.length === 0 && <p className="text-sm text-slate-500">No archived habits.</p>}
-          {archived.map((habit) => (
-            <div key={habit.id} className="flex items-center justify-between gap-3 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
-              <p className="font-medium text-slate-500">{habit.name}</p>
-              <button type="button" onClick={() => restore(habit)} className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold">
-                Restore
-              </button>
-            </div>
-          ))}
+        <div className="flex items-center justify-end gap-2">
+          <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold">
+            Cancel
+          </button>
+          <button type="button" onClick={submit} className="px-4 py-2.5 rounded-xl bg-gradient-accent text-white text-sm font-bold">
+            Save changes
+          </button>
         </div>
       </div>
     </div>
@@ -781,13 +1153,21 @@ function DayEditorModal({
                       </span>
                       <p className="font-semibold truncate">{habit.name}</p>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setStatus(habit, date, "DONE")}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${log?.status === "DONE" ? "bg-green-100 dark:bg-green-900/40 border-green-400 text-green-700 dark:text-green-300" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                        onClick={() => setStatus(habit, date, log?.status === "DONE" ? "NONE" : "DONE")}
+                        className={`size-7 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
+                          log?.status === "DONE"
+                            ? "border-transparent text-white shadow-md"
+                            : "border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500"
+                        }`}
+                        style={log?.status === "DONE" ? { background: habit.color ?? "#22c55e" } : undefined}
+                        title={log?.status === "DONE" ? "Uncheck to clear" : "Mark done"}
                       >
-                        Done
+                        {log?.status === "DONE" ? (
+                          <span className="material-symbols-outlined text-base font-bold">check</span>
+                        ) : null}
                       </button>
                       {habit.allowPartial && (
                         <button
@@ -807,13 +1187,6 @@ function DayEditorModal({
                           Skip
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setStatus(habit, date, "NONE")}
-                        className="px-2 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
-                      >
-                        Clear
-                      </button>
                     </div>
                   </div>
 

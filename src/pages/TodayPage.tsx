@@ -516,30 +516,61 @@ export default function TodayPage() {
                 )}
               </h3>
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowAllTasksDrawer(true)}
-                  className="text-slate-600 dark:text-slate-400 text-sm font-semibold flex items-center gap-1 hover:text-primary transition-colors"
-                  title="View all tasks"
-                >
-                  <span className="material-symbols-outlined text-sm">list</span>
-                  <span className="hidden md:inline">All tasks</span>
-                </button>
-                <button
-                  onClick={() => setShowLogTaskModal(true)}
-                  className="text-slate-600 dark:text-slate-400 text-sm font-semibold flex items-center gap-1 hover:text-primary transition-colors"
-                  title="Log Task"
-                >
-                  <span className="material-symbols-outlined text-sm">history_edu</span>
-                  <span className="hidden md:inline">Log Task</span>
-                </button>
-                <button
-                  onClick={() => setShowModal(true)}
-                  className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
-                  title="Add Task"
-                >
-                  <span className="material-symbols-outlined text-sm">add_circle</span>
-                  <span className="hidden md:inline">Add Task</span>
-                </button>
+                <div className="relative group">
+                  <Link
+                    to="/habits"
+                    className="text-slate-600 dark:text-slate-400 text-sm font-semibold flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
+                    title="Track Habits"
+                  >
+                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                    <span className="hidden md:inline">Track habits</span>
+                  </Link>
+                  <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all pointer-events-none whitespace-nowrap z-50 md:hidden">
+                    Track habits
+                  </span>
+                </div>
+
+                <div className="relative group">
+                  <button
+                    onClick={() => setShowAllTasksDrawer(true)}
+                    className="text-slate-600 dark:text-slate-400 text-sm font-semibold flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
+                    title="View all tasks"
+                  >
+                    <span className="material-symbols-outlined text-sm">list</span>
+                    <span className="hidden md:inline">All tasks</span>
+                  </button>
+                  <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all pointer-events-none whitespace-nowrap z-50 md:hidden">
+                    All tasks
+                  </span>
+                </div>
+
+                <div className="relative group">
+                  <button
+                    onClick={() => setShowLogTaskModal(true)}
+                    className="text-slate-600 dark:text-slate-400 text-sm font-semibold flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
+                    title="Log Task"
+                  >
+                    <span className="material-symbols-outlined text-sm">history_edu</span>
+                    <span className="hidden md:inline">Log Task</span>
+                  </button>
+                  <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all pointer-events-none whitespace-nowrap z-50 md:hidden">
+                    Log Task
+                  </span>
+                </div>
+
+                <div className="relative group">
+                  <button
+                    onClick={() => setShowModal(true)}
+                    className="text-primary text-sm font-bold flex items-center gap-1 cursor-pointer"
+                    title="Add Task"
+                  >
+                    <span className="material-symbols-outlined text-sm">add_circle</span>
+                    <span className="hidden md:inline">Add Task</span>
+                  </button>
+                  <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all pointer-events-none whitespace-nowrap z-50 md:hidden">
+                    Add Task
+                  </span>
+                </div>
               </div>
             </div>
             {tab === "Life" && (
