@@ -2,13 +2,29 @@ import Dexie, { type EntityTable } from "dexie";
 import type { Habit, HabitLog, HabitLogStatus } from "./habits";
 
 export type TaskDomain = "LIFE_ADMIN" | "BUSINESS";
-export type LifeAdminCategoryKind = "LEGAL" | "MONEY" | "MAINTENANCE" | "CAREGIVER";
-export type BuilderCategoryKind = "LEGAL" | "CONTENT" | "PRODUCT" | "NETWORKING" | "LEARNING" | "OPS";
+export type LifeAdminCategoryKind =
+  | "LEGAL"
+  | "MONEY"
+  | "MAINTENANCE"
+  | "CAREGIVER";
+export type BuilderCategoryKind =
+  | "LEGAL"
+  | "CONTENT"
+  | "PRODUCT"
+  | "NETWORKING"
+  | "LEARNING"
+  | "OPS";
 export type CategoryKind =
   | LifeAdminCategoryKind
   | BuilderCategoryKind
   | "CUSTOM";
-export type TaskStatus = "BACKLOG" | "TODAY" | "IN_PROGRESS" | "PENDING" | "DONE" | "ARCHIVED";
+export type TaskStatus =
+  | "BACKLOG"
+  | "TODAY"
+  | "IN_PROGRESS"
+  | "PENDING"
+  | "DONE"
+  | "ARCHIVED";
 export type TimeTrackingMode = "TASK" | "PROJECT";
 
 export interface Category {
@@ -109,7 +125,7 @@ export interface Win {
   createdAt: string;
 }
 
-const db = new Dexie("StabilizationOS") as Dexie & {
+const db = new Dexie("StabilizationOS_vNext") as Dexie & {
   categories: EntityTable<Category, "id">;
   tasks: EntityTable<Task, "id">;
   timeEntries: EntityTable<TimeEntry, "id">;
@@ -123,107 +139,6 @@ const db = new Dexie("StabilizationOS") as Dexie & {
 };
 
 db.version(1).stores({
-  categories: "id, kind",
-  tasks: "id, categoryId, status, priority, domain",
-  timeEntries: "id, taskId",
-  weeklyReviews: "id, weekStart",
-  timerState: "id",
-  appSettings: "id",
-});
-
-db.version(2).stores({
-  categories: "id, kind",
-  tasks: "id, categoryId, status, priority, domain",
-  timeEntries: "id, taskId",
-  weeklyReviews: "id, weekStart",
-  timerState: "id",
-  appSettings: "id",
-  dailyCapacity: "id, [date+domain]",
-}).upgrade(tx => {
-  return tx.table("appSettings").toCollection().modify(settings => {
-    if (settings.builderAvailableMinutes === undefined) {
-      settings.builderAvailableMinutes = 120;
-    }
-  });
-});
-
-db.version(3).stores({
-  categories: "id, kind",
-  tasks: "id, categoryId, status, priority, domain",
-  timeEntries: "id, taskId",
-  weeklyReviews: "id, weekStart",
-  timerState: "id",
-  appSettings: "id",
-  dailyCapacity: "id, [date+domain]",
-  wins: "id, date, createdAt",
-});
-
-db.version(4).stores({
-  categories: "id, kind, domain",
-  tasks: "id, categoryId, status, priority, domain",
-  timeEntries: "id, taskId",
-  weeklyReviews: "id, weekStart",
-  timerState: "id",
-  appSettings: "id",
-  dailyCapacity: "id, [date+domain]",
-  wins: "id, date, createdAt",
-}).upgrade(async (tx) => {
-  const cats = await tx.table("categories").toArray();
-  const oldLegalId = cats.find((c: { kind: string }) => c.kind === "LEGAL")?.id;
-  for (const c of cats) {
-    await tx.table("categories").update(c.id, { domain: "LIFE_ADMIN" });
-  }
-  const builderCats = [
-    { id: generateId(), name: "LEGAL", kind: "LEGAL", domain: "BUSINESS", contextCard: { why: "Protects your business and intellectual property. Compliance and contracts reduce future risk.", winCondition: "All business-critical documents filed, agreements signed, and compliance current.", script: "One step at a time. Your business is protected." } },
-    { id: generateId(), name: "CONTENT", kind: "CONTENT", domain: "BUSINESS", contextCard: { why: "Content builds reach and trust. Each piece compounds your audience and authority.", winCondition: "Consistent output that serves your audience and advances your message.", script: "Ship it. Done is better than perfect." } },
-    { id: generateId(), name: "PRODUCT", kind: "PRODUCT", domain: "BUSINESS", contextCard: { why: "The product is what delivers value. Building and refining it is core to your business.", winCondition: "Core features work, users are unblocked, and the roadmap is clear.", script: "Focus on the next release. Iterate." } },
-    { id: generateId(), name: "NETWORKING", kind: "NETWORKING", domain: "BUSINESS", contextCard: { why: "Relationships open doors. Warm outreach and genuine connection create opportunities.", winCondition: "Key relationships nurtured, introductions made, and you show up consistently.", script: "One conversation at a time. Be helpful." } },
-    { id: generateId(), name: "LEARNING", kind: "LEARNING", domain: "BUSINESS", contextCard: { why: "Skills compound. Learning keeps you sharp and ahead of shifts in your field.", winCondition: "Time blocked for learning, skills applied, and knowledge gaps closing.", script: "Small increments. You're building capability." } },
-    { id: generateId(), name: "OPS", kind: "OPS", domain: "BUSINESS", contextCard: { why: "Operations keep everything running. Tools, systems, and processes prevent chaos.", winCondition: "Systems work, vendors are managed, and the machine runs smoothly.", script: "Fix the leak. Automate the repeat." } },
-  ];
-  const builderLegalId = builderCats[0].id;
-  const builderOpsId = builderCats[5].id;
-  for (const b of builderCats) {
-    await tx.table("categories").add(b);
-  }
-  const businessTasks = await tx.table("tasks").where("domain").equals("BUSINESS").toArray();
-  for (const t of businessTasks) {
-    const newCatId = t.categoryId === oldLegalId ? builderLegalId : builderOpsId;
-    await tx.table("tasks").update(t.id, { categoryId: newCatId });
-  }
-});
-
-db.version(5).stores({
-  categories: "id, kind, domain",
-  tasks: "id, categoryId, status, priority, domain",
-  timeEntries: "id, taskId",
-  weeklyReviews: "id, weekStart",
-  timerState: "id",
-  appSettings: "id",
-  dailyCapacity: "id, [date+domain]",
-  wins: "id, date, createdAt",
-}).upgrade(tx => {
-  return tx.table("appSettings").toCollection().modify((settings: { hiddenCategoryIds?: string[] }) => {
-    if (settings.hiddenCategoryIds === undefined) {
-      settings.hiddenCategoryIds = [];
-    }
-  });
-});
-
-db.version(6).stores({
-  categories: "id, kind, domain",
-  tasks: "id, categoryId, status, priority, domain",
-  timeEntries: "id, taskId",
-  weeklyReviews: "id, weekStart",
-  timerState: "id",
-  appSettings: "id",
-  dailyCapacity: "id, [date+domain]",
-  wins: "id, date, createdAt",
-  habits: "id, archivedAt, sortOrder, showInToday",
-  habitLogs: "id, habitId, date, [habitId+date], status",
-});
-
-db.version(7).stores({
   categories: "id, kind, domain",
   tasks: "id, categoryId, status, priority, domain",
   timeEntries: "id, taskId",
@@ -233,13 +148,7 @@ db.version(7).stores({
   dailyCapacity: "id, [date+domain]",
   wins: "id, date, createdAt",
   habits: "id, archivedAt, sortOrder, showInToday, timeOfDay",
-  habitLogs: "id, habitId, date, [habitId+date], status",
-}).upgrade(tx => {
-  return tx.table("habits").toCollection().modify((habit: { timeOfDay?: string }) => {
-    if (!habit.timeOfDay) {
-      habit.timeOfDay = "ANYTIME";
-    }
-  });
+  habitLogs: "id, habitId, date, [habitId+date], status"
 });
 
 export { db };
@@ -270,7 +179,10 @@ export function getEffectiveMinutes(
   return settings?.availableMinutes ?? 120;
 }
 
-export async function setDailyCapacity(domain: TaskDomain, minutes: number): Promise<void> {
+export async function setDailyCapacity(
+  domain: TaskDomain,
+  minutes: number
+): Promise<void> {
   const date = todayDateStr();
   const existing = await db.dailyCapacity
     .where("[date+domain]")
@@ -313,7 +225,7 @@ export async function upsertHabitLog(
       status: updates.status,
       value: updates.value,
       note: updates.note,
-      updatedAt: now,
+      updatedAt: now
     });
     return;
   }
@@ -325,7 +237,7 @@ export async function upsertHabitLog(
     value: updates.value,
     note: updates.note,
     createdAt: now,
-    updatedAt: now,
+    updatedAt: now
   });
 }
 
@@ -350,7 +262,10 @@ export async function transitionDuePendingTasks(): Promise<number> {
   const pending = await db.tasks.where("status").equals("PENDING").toArray();
   let count = 0;
   for (const task of pending) {
-    if (task.nextActionAt && new Date(task.nextActionAt).getTime() <= Date.now()) {
+    if (
+      task.nextActionAt &&
+      new Date(task.nextActionAt).getTime() <= Date.now()
+    ) {
       await db.tasks.update(task.id, { status: "BACKLOG", updatedAt: now });
       count++;
     }
@@ -360,7 +275,11 @@ export async function transitionDuePendingTasks(): Promise<number> {
 
 export async function markTaskDone(taskId: string): Promise<void> {
   const now = nowISO();
-  await db.tasks.update(taskId, { status: "DONE", completedAt: now, updatedAt: now });
+  await db.tasks.update(taskId, {
+    status: "DONE",
+    completedAt: now,
+    updatedAt: now
+  });
 }
 
 export async function markTaskArchived(taskId: string): Promise<void> {
@@ -369,13 +288,17 @@ export async function markTaskArchived(taskId: string): Promise<void> {
   await db.tasks.update(taskId, {
     status: "ARCHIVED",
     completedAt: task?.completedAt ?? now,
-    updatedAt: now,
+    updatedAt: now
   });
 }
 
 export async function unmarkTaskDone(taskId: string): Promise<void> {
   const now = nowISO();
-  await db.tasks.update(taskId, { status: "BACKLOG", completedAt: undefined, updatedAt: now });
+  await db.tasks.update(taskId, {
+    status: "BACKLOG",
+    completedAt: undefined,
+    updatedAt: now
+  });
 }
 
 // --- Scoring ---
@@ -392,7 +315,7 @@ const KIND_WEIGHTS: Record<string, number> = {
   NETWORKING: 20,
   LEARNING: 15,
   OPS: 10,
-  CUSTOM: 10,
+  CUSTOM: 10
 };
 
 export function scoreTask(
@@ -454,14 +377,17 @@ export function buildStabilizerStackSplit(
 
   const pinned = pool.filter((t) => t.status === "TODAY").slice(0, maxTasks);
   const pinnedIds = new Set(pinned.map((t) => t.id));
-  const pinnedMins = pinned.reduce((s, t) => s + (getTaskEstimateMinutes(t) || 15), 0);
+  const pinnedMins = pinned.reduce(
+    (s, t) => s + (getTaskEstimateMinutes(t) || 15),
+    0
+  );
   const minsLeft = Math.max(0, remainingCapacity - pinnedMins);
 
   const scored = pool
     .filter((t) => !pinnedIds.has(t.id))
     .map((t) => ({
       task: t,
-      score: scoreTask(t, catMap.get(t.categoryId)?.kind, minsLeft),
+      score: scoreTask(t, catMap.get(t.categoryId)?.kind, minsLeft)
     }))
     .filter((s) => s.score >= 0)
     .sort((a, b) => b.score - a.score);
@@ -487,11 +413,7 @@ export function buildStabilizerStackSplit(
     return result;
   };
 
-  const suggested = fillFromScored(
-    scored,
-    maxTasks - pinned.length,
-    minsLeft
-  );
+  const suggested = fillFromScored(scored, maxTasks - pinned.length, minsLeft);
 
   return { pinned, suggested };
 }
@@ -511,7 +433,10 @@ export function buildStabilizerStack(
   return [...pinned, ...suggested];
 }
 
-export function getCategoriesByDomain(categories: Category[], domain: TaskDomain): Category[] {
+export function getCategoriesByDomain(
+  categories: Category[],
+  domain: TaskDomain
+): Category[] {
   return categories.filter((c) => c.domain === domain);
 }
 
@@ -523,21 +448,29 @@ export function getTaskEstimateMinutes(task: Task): number {
   if (!isProjectMode(task)) {
     return task.estimateMinutes ?? 0;
   }
-  return task.subtasks.reduce((sum, subtask) => sum + (subtask.estimateMinutes ?? 0), 0);
+  return task.subtasks.reduce(
+    (sum, subtask) => sum + (subtask.estimateMinutes ?? 0),
+    0
+  );
 }
 
 export function getTaskActualSeconds(task: Task): number {
   if (!isProjectMode(task)) {
     return task.actualSecondsTotal;
   }
-  return task.subtasks.reduce((sum, subtask) => sum + (subtask.actualSecondsTotal ?? 0), 0);
+  return task.subtasks.reduce(
+    (sum, subtask) => sum + (subtask.actualSecondsTotal ?? 0),
+    0
+  );
 }
 
-export function stripSubtaskTimeFields(subtasks: Subtask[]): Array<{ id: string; title: string; done: boolean }> {
+export function stripSubtaskTimeFields(
+  subtasks: Subtask[]
+): Array<{ id: string; title: string; done: boolean }> {
   return subtasks.map((subtask) => ({
     id: subtask.id,
     title: subtask.title,
-    done: subtask.done,
+    done: subtask.done
   }));
 }
 
@@ -546,7 +479,9 @@ export async function getHiddenCategoryIds(): Promise<string[]> {
   return settings?.hiddenCategoryIds ?? [];
 }
 
-export async function toggleCategoryVisibility(categoryId: string): Promise<void> {
+export async function toggleCategoryVisibility(
+  categoryId: string
+): Promise<void> {
   const settings = await db.appSettings.get("default");
   const hidden = settings?.hiddenCategoryIds ?? [];
   const next = hidden.includes(categoryId)
@@ -559,14 +494,14 @@ export async function toggleCategoryVisibility(categoryId: string): Promise<void
     availableMinutes: settings?.availableMinutes ?? 120,
     builderAvailableMinutes: settings?.builderAvailableMinutes ?? 120,
     darkMode: settings?.darkMode ?? false,
-    hiddenCategoryIds: next,
+    hiddenCategoryIds: next
   });
 }
 
 const DEFAULT_CONTEXT_CARD = {
   why: "A custom category that matters to you.",
   winCondition: "Progress made and clarity gained.",
-  script: "One step at a time.",
+  script: "One step at a time."
 };
 
 export async function addCustomCategory(
@@ -574,7 +509,10 @@ export async function addCustomCategory(
   domain: TaskDomain,
   contextCard?: { why: string; winCondition: string; script: string }
 ): Promise<Category | null> {
-  const customCount = await db.categories.where("kind").equals("CUSTOM").count();
+  const customCount = await db.categories
+    .where("kind")
+    .equals("CUSTOM")
+    .count();
   if (customCount >= 5) return null;
 
   const category: Category = {
@@ -582,7 +520,7 @@ export async function addCustomCategory(
     name: name.trim(),
     kind: "CUSTOM",
     domain,
-    contextCard: contextCard ?? DEFAULT_CONTEXT_CARD,
+    contextCard: contextCard ?? DEFAULT_CONTEXT_CARD
   };
   await db.categories.add(category);
   return category;
@@ -592,9 +530,13 @@ export async function deleteCustomCategory(id: string): Promise<boolean> {
   const cat = await db.categories.get(id);
   if (!cat || cat.kind !== "CUSTOM") return false;
 
-  const tasksInCategory = await db.tasks.where("categoryId").equals(id).toArray();
-  const defaultCats = (await db.categories.where("domain").equals(cat.domain).toArray())
-    .filter((c) => c.kind !== "CUSTOM");
+  const tasksInCategory = await db.tasks
+    .where("categoryId")
+    .equals(id)
+    .toArray();
+  const defaultCats = (
+    await db.categories.where("domain").equals(cat.domain).toArray()
+  ).filter((c) => c.kind !== "CUSTOM");
   const fallbackId = defaultCats[0]?.id;
   const now = nowISO();
 
@@ -620,8 +562,12 @@ export function getWaitingTasks(tasks: Task[], domain: TaskDomain): Task[] {
   return tasks
     .filter((t) => t.domain === domain && isWaiting(t))
     .sort((a, b) => {
-      const aDate = a.nextActionAt ? new Date(a.nextActionAt).getTime() : Infinity;
-      const bDate = b.nextActionAt ? new Date(b.nextActionAt).getTime() : Infinity;
+      const aDate = a.nextActionAt
+        ? new Date(a.nextActionAt).getTime()
+        : Infinity;
+      const bDate = b.nextActionAt
+        ? new Date(b.nextActionAt).getTime()
+        : Infinity;
       return aDate - bDate;
     });
 }
@@ -643,8 +589,8 @@ export async function seedDatabase() {
         why: "Fundamental security and peace of mind. Ensures your life and business have a protected foundation.",
         winCondition:
           "Every crucial document is filed, deadlines met, and you are 100% compliant.",
-        script: "One step at a time. You are protected.",
-      },
+        script: "One step at a time. You are protected."
+      }
     },
     {
       id: generateId(),
@@ -655,8 +601,8 @@ export async function seedDatabase() {
         why: "The fuel for your projects and family. Financial clarity removes the weight of the unknown.",
         winCondition:
           "Runway is known, bills are automated, and cash flow supports your current state.",
-        script: "You are handling the essentials. You are in control.",
-      },
+        script: "You are handling the essentials. You are in control."
+      }
     },
     {
       id: generateId(),
@@ -667,8 +613,8 @@ export async function seedDatabase() {
         why: "Your environment and body. Small leaks sink great ships; keeping the baseline prevents chaos.",
         winCondition:
           "Physical spaces are clear, systems are operational, and health is actively sustained.",
-        script: "Focus on the process. Your space is ready for you.",
-      },
+        script: "Focus on the process. Your space is ready for you."
+      }
     },
     {
       id: generateId(),
@@ -679,18 +625,84 @@ export async function seedDatabase() {
         why: "People and relationships. Caregiving, family, and connection are the foundation of stability.",
         winCondition:
           "Key relationships nurtured, dependents cared for, and your capacity to show up is sustained.",
-        script: "Breathe through the tasks. You are resilient.",
-      },
-    },
+        script: "Breathe through the tasks. You are resilient."
+      }
+    }
   ];
 
   const builderCategories: Category[] = [
-    { id: generateId(), name: "LEGAL", kind: "LEGAL", domain: "BUSINESS", contextCard: { why: "Protects your business and intellectual property. Compliance and contracts reduce future risk.", winCondition: "All business-critical documents filed, agreements signed, and compliance current.", script: "One step at a time. Your business is protected." } },
-    { id: generateId(), name: "CONTENT", kind: "CONTENT", domain: "BUSINESS", contextCard: { why: "Content builds reach and trust. Each piece compounds your audience and authority.", winCondition: "Consistent output that serves your audience and advances your message.", script: "Ship it. Done is better than perfect." } },
-    { id: generateId(), name: "PRODUCT", kind: "PRODUCT", domain: "BUSINESS", contextCard: { why: "The product is what delivers value. Building and refining it is core to your business.", winCondition: "Core features work, users are unblocked, and the roadmap is clear.", script: "Focus on the next release. Iterate." } },
-    { id: generateId(), name: "NETWORKING", kind: "NETWORKING", domain: "BUSINESS", contextCard: { why: "Relationships open doors. Warm outreach and genuine connection create opportunities.", winCondition: "Key relationships nurtured, introductions made, and you show up consistently.", script: "One conversation at a time. Be helpful." } },
-    { id: generateId(), name: "LEARNING", kind: "LEARNING", domain: "BUSINESS", contextCard: { why: "Skills compound. Learning keeps you sharp and ahead of shifts in your field.", winCondition: "Time blocked for learning, skills applied, and knowledge gaps closing.", script: "Small increments. You're building capability." } },
-    { id: generateId(), name: "OPS", kind: "OPS", domain: "BUSINESS", contextCard: { why: "Operations keep everything running. Tools, systems, and processes prevent chaos.", winCondition: "Systems work, vendors are managed, and the machine runs smoothly.", script: "Fix the leak. Automate the repeat." } },
+    {
+      id: generateId(),
+      name: "LEGAL",
+      kind: "LEGAL",
+      domain: "BUSINESS",
+      contextCard: {
+        why: "Protects your business and intellectual property. Compliance and contracts reduce future risk.",
+        winCondition:
+          "All business-critical documents filed, agreements signed, and compliance current.",
+        script: "One step at a time. Your business is protected."
+      }
+    },
+    {
+      id: generateId(),
+      name: "CONTENT",
+      kind: "CONTENT",
+      domain: "BUSINESS",
+      contextCard: {
+        why: "Content builds reach and trust. Each piece compounds your audience and authority.",
+        winCondition:
+          "Consistent output that serves your audience and advances your message.",
+        script: "Ship it. Done is better than perfect."
+      }
+    },
+    {
+      id: generateId(),
+      name: "PRODUCT",
+      kind: "PRODUCT",
+      domain: "BUSINESS",
+      contextCard: {
+        why: "The product is what delivers value. Building and refining it is core to your business.",
+        winCondition:
+          "Core features work, users are unblocked, and the roadmap is clear.",
+        script: "Focus on the next release. Iterate."
+      }
+    },
+    {
+      id: generateId(),
+      name: "NETWORKING",
+      kind: "NETWORKING",
+      domain: "BUSINESS",
+      contextCard: {
+        why: "Relationships open doors. Warm outreach and genuine connection create opportunities.",
+        winCondition:
+          "Key relationships nurtured, introductions made, and you show up consistently.",
+        script: "One conversation at a time. Be helpful."
+      }
+    },
+    {
+      id: generateId(),
+      name: "LEARNING",
+      kind: "LEARNING",
+      domain: "BUSINESS",
+      contextCard: {
+        why: "Skills compound. Learning keeps you sharp and ahead of shifts in your field.",
+        winCondition:
+          "Time blocked for learning, skills applied, and knowledge gaps closing.",
+        script: "Small increments. You're building capability."
+      }
+    },
+    {
+      id: generateId(),
+      name: "OPS",
+      kind: "OPS",
+      domain: "BUSINESS",
+      contextCard: {
+        why: "Operations keep everything running. Tools, systems, and processes prevent chaos.",
+        winCondition:
+          "Systems work, vendors are managed, and the machine runs smoothly.",
+        script: "Fix the leak. Automate the repeat."
+      }
+    }
   ];
 
   await db.categories.bulkAdd([...lifeAdminCategories, ...builderCategories]);
@@ -713,220 +725,29 @@ export async function seedDatabase() {
       actualSecondsTotal: 0,
       contextCard: {
         why: "Restores legal travel/ID flexibility and removes a major background stressor.",
-        nextMicroStep: "Confirm renewal path + required documents, then pick the earliest appointment/mail option.",
-        reframe: "This is competency restoration — one admin step that unlocks future freedom.",
+        nextMicroStep:
+          "Confirm renewal path + required documents, then pick the earliest appointment/mail option.",
+        reframe:
+          "This is competency restoration — one admin step that unlocks future freedom."
       },
       createdAt: now,
       updatedAt: now,
       subtasks: [
-        { id: generateId(), title: "Confirm renewal method (mail vs appointment)", done: false },
+        {
+          id: generateId(),
+          title: "Confirm renewal method (mail vs appointment)",
+          done: false
+        },
         { id: generateId(), title: "Gather required documents", done: false },
         { id: generateId(), title: "Take/obtain passport photo", done: false },
-        { id: generateId(), title: "Complete DS-82 / required form", done: false },
-        { id: generateId(), title: "Pay fee + submit", done: false },
-      ],
-    },
-    {
-      id: generateId(),
-      categoryId: legalId,
-      domain: "LIFE_ADMIN",
-      title: "Homeschool application: check deadline + submit if due",
-      status: "BACKLOG",
-      priority: 1,
-      estimateMinutes: 20,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Protects Sophie's schooling compliance and prevents last-minute panic.",
-        nextMicroStep: "Open the official site and write down the exact deadline date.",
-        reframe: "Clarity first. Once I know the date, this becomes a simple checklist.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [
-        { id: generateId(), title: "Find the official deadline date", done: false },
-        { id: generateId(), title: "If due: complete and submit application", done: false },
-        { id: generateId(), title: "Save confirmation / receipt", done: false },
-      ],
-    },
-    {
-      id: generateId(),
-      categoryId: legalId,
-      domain: "LIFE_ADMIN",
-      title: "Taxes prep: gather docs + decide filing status",
-      status: "BACKLOG",
-      priority: 1,
-      estimateMinutes: 60,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Early prep reduces stress and avoids the seasonal rush with your tax preparer.",
-        nextMicroStep: "Make a short list of missing items needed from your husband and request them.",
-        reframe: "This is runway protection: clean taxes = fewer surprises later.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [
-        { id: generateId(), title: "Confirm: file jointly vs separately (note questions for tax pro)", done: false },
-        { id: generateId(), title: "Request missing tax papers from husband", done: false },
-        { id: generateId(), title: "Upload/organize all docs for tax preparer", done: false },
-      ],
-    },
-    {
-      id: generateId(),
-      categoryId: moneyId,
-      domain: "LIFE_ADMIN",
-      title: "Unemployment: submit final request (after waiting period)",
-      status: "PENDING",
-      priority: 2,
-      estimateMinutes: 10,
-      actualSecondsTotal: 0,
-      moneyImpact: 275,
-      nextActionAt: "2026-03-02",
-      pendingReason: "Earliest request date",
-      contextCard: {
-        why: "Small task, real money — closes the loop and reduces financial pressure.",
-        nextMicroStep: "Add the eligibility date to this task, then set a reminder for that morning.",
-        reframe: "This is not paperwork — it's cash recovery.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [
-        { id: generateId(), title: "Confirm date you can submit", done: false },
-        { id: generateId(), title: "Submit claim request", done: false },
-        { id: generateId(), title: "Save confirmation screenshot", done: false },
-      ],
-    },
-    {
-      id: generateId(),
-      categoryId: moneyId,
-      domain: "LIFE_ADMIN",
-      title: "Categorize January credit card transactions + mark business",
-      status: "BACKLOG",
-      priority: 2,
-      estimateMinutes: 60,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Creates clean financial clarity for taxes and business tracking.",
-        nextMicroStep: "Export January statement (CSV/PDF) and do the first 10 transactions.",
-        reframe: "Momentum beats perfection. Ten rows is a win.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [
-        { id: generateId(), title: "Export January statement", done: false },
-        { id: generateId(), title: "Mark business transactions", done: false },
-        { id: generateId(), title: "Finish categorization", done: false },
-      ],
-    },
-    {
-      id: generateId(),
-      categoryId: moneyId,
-      domain: "LIFE_ADMIN",
-      title: "Select homeschool charges from statements (prep for PEP reimbursement)",
-      status: "BACKLOG",
-      priority: 2,
-      estimateMinutes: 45,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Turns past spending into recoverable funds and reduces money anxiety.",
-        nextMicroStep: "Filter statements for homeschool vendors and copy items into a draft list.",
-        reframe: "This is a treasure hunt for money already spent.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [
-        { id: generateId(), title: "Identify homeschool purchases in statements", done: false },
-        { id: generateId(), title: "Create reimbursement list (vendor, date, amount)", done: false },
-      ],
-    },
-    {
-      id: generateId(),
-      categoryId: moneyId,
-      domain: "LIFE_ADMIN",
-      title: "Submit homeschool reimbursements (15 items) + request missing proof",
-      status: "BACKLOG",
-      priority: 2,
-      estimateMinutes: 90,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Direct cash recovery — reduces panic and extends runway.",
-        nextMicroStep: "Submit the easiest 3 reimbursements first to build momentum.",
-        reframe: "This isn't a 'big scary task' — it's 15 small wins.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [
-        { id: generateId(), title: "Create list of 15 reimbursements", done: false },
-        { id: generateId(), title: "Submit 3 easiest first", done: false },
-        { id: generateId(), title: "Request missing proof/docs", done: false },
-        { id: generateId(), title: "Submit remaining items", done: false },
-        { id: generateId(), title: "Save confirmations", done: false },
-      ],
-    },
-    {
-      id: generateId(),
-      categoryId: moneyId,
-      domain: "LIFE_ADMIN",
-      title: "SunPass: investigate charges tied to old pass",
-      status: "BACKLOG",
-      priority: 3,
-      estimateMinutes: 20,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Stops recurring leaks and prevents surprise fees.",
-        nextMicroStep: "Log in and locate the account/pass that's generating charges.",
-        reframe: "Fixing leaks is earning money.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [
-        { id: generateId(), title: "Log into SunPass", done: false },
-        { id: generateId(), title: "Identify old pass + associated vehicle/plate", done: false },
-        { id: generateId(), title: "Resolve/close/transfer and confirm charges stop", done: false },
-      ],
-    },
-    {
-      id: generateId(),
-      categoryId: caregiverId,
-      domain: "LIFE_ADMIN",
-      title: "Divorce paperwork: decide urgency + outline next steps",
-      status: "BACKLOG",
-      priority: 3,
-      estimateMinutes: 30,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Closes a long-running open loop and protects future legal/financial clarity.",
-        nextMicroStep: "Write down 3 questions (timing, filing, implications) to ask a professional.",
-        reframe: "This is clarity work — not drama.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [
-        { id: generateId(), title: "List questions for lawyer/mediator (timing, costs, implications)", done: false },
-        { id: generateId(), title: "Collect key documents (marriage date, assets list basics)", done: false },
-        { id: generateId(), title: "Decide: file now vs later", done: false },
-      ],
-    },
-    {
-      id: generateId(),
-      categoryId: maintenanceId,
-      domain: "LIFE_ADMIN",
-      title: "Ask brother to take over OpenAI membership for sister",
-      status: "BACKLOG",
-      priority: 4,
-      estimateMinutes: 5,
-      actualSecondsTotal: 0,
-      contextCard: {
-        why: "Clears recurring admin and prevents avoidable subscription confusion.",
-        nextMicroStep: "Send a single text with exactly what you need him to do.",
-        reframe: "One message removes a repeating headache.",
-      },
-      createdAt: now,
-      updatedAt: now,
-      subtasks: [
-        { id: generateId(), title: "Send brother the request + instructions", done: false },
-        { id: generateId(), title: "Confirm it's transferred", done: false },
-      ],
-    },
+        {
+          id: generateId(),
+          title: "Complete DS-82 / required form",
+          done: false
+        },
+        { id: generateId(), title: "Pay fee + submit", done: false }
+      ]
+    }
   ];
 
   await db.tasks.bulkAdd(tasks);
@@ -937,6 +758,6 @@ export async function seedDatabase() {
     availableMinutes: 120,
     builderAvailableMinutes: 120,
     darkMode: false,
-    hiddenCategoryIds: [],
+    hiddenCategoryIds: []
   });
 }

@@ -546,7 +546,7 @@ export default function TaskDetailPage() {
                         setEditingSubtaskTitle(sub.title);
                         setEditingSubtaskId(sub.id);
                       }}
-                      className={`text-sm flex-1 text-left min-w-0 whitespace-normal break-words ${
+                      className={`text-sm flex-1 text-left min-w-0 whitespace-normal wrap-break-word ${
                         sub.done ? "text-slate-400 line-through" : ""
                       } hover:opacity-80 transition-opacity`}
                     >

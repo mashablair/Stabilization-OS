@@ -688,7 +688,7 @@ export default function TodayPage() {
 
             {doneOpen && (
               <div className="flex flex-col gap-3 mt-2">
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-xl border border-green-200 dark:border-green-800/40 p-4 flex items-center gap-3">
+                <div className="bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-xl border border-green-200 dark:border-green-800/40 p-4 flex items-center gap-3">
                   <span className="material-symbols-outlined text-2xl text-green-500">celebration</span>
                   <p className="text-sm font-medium text-green-700 dark:text-green-300">
                     {doneToday.length === 1
@@ -709,7 +709,7 @@ export default function TodayPage() {
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <button
                           onClick={() => unmarkTaskDone(task.id)}
-                          className="size-6 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity"
+                          className="size-6 rounded-full bg-linear-to-br from-green-400 to-emerald-500 flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity"
                           title="Undo"
                         >
                           <span className="material-symbols-outlined text-white text-sm">check</span>

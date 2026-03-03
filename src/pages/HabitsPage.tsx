@@ -543,7 +543,7 @@ function AddHabitModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="max-w-2xl mx-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">Add Habit</h2>
@@ -993,7 +993,7 @@ function ManageHabitsModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
         <div className="max-w-2xl mx-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">Manage Habits</h2>
@@ -1141,7 +1141,7 @@ function EditHabitModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-70 bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="max-w-2xl mx-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">Edit Habit</h2>

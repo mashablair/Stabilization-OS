@@ -261,6 +261,9 @@ export default function SettingsPage() {
             Import a previously exported bundle. This will{" "}
             <strong>overwrite</strong> all local data.
           </p>
+          <p className="text-xs text-slate-500 mb-4">
+            If you reset local DB schema, export first, then import here to restore your data.
+          </p>
           <label className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 cursor-pointer hover:border-primary transition-colors font-bold text-slate-600 dark:text-slate-300">
             <span className="material-symbols-outlined">upload_file</span>
             Choose .json file

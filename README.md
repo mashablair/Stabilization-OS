@@ -41,7 +41,7 @@ Habit tracking uses two tables:
 
 ## Seed Data
 
-On first run, the app automatically creates 4 Life categories (LEGAL, MONEY, MAINTENANCE, CAREGIVER), 6 Builder categories (LEGAL, CONTENT, PRODUCT, NETWORKING, LEARNING, OPS), and 10 sample Life tasks. To re-seed, use the **Reset All Data** option in Settings and reload the page.
+On first run, the app automatically creates 4 Life categories (LEGAL, MONEY, MAINTENANCE, CAREGIVER), 6 Builder categories (LEGAL, CONTENT, PRODUCT, NETWORKING, LEARNING, OPS), and 1 sample Life task. To re-seed, use the **Reset All Data** option in Settings and reload the page.
 
 ## Task Lifecycle
 

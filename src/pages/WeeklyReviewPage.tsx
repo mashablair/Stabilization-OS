@@ -227,7 +227,7 @@ export default function WeeklyReviewPage() {
                   </Link>
                 </div>
 
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-xl p-4 border border-green-200/50 dark:border-green-800/30">
+                <div className="bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-xl p-4 border border-green-200/50 dark:border-green-800/30">
                   <p className="text-sm font-medium text-green-700 dark:text-green-300 italic text-center">
                     {recentWins.length >= 5
                       ? "Outstanding week. You're proving that steady progress beats perfection."

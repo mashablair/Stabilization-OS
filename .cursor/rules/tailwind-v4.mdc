@@ -1,0 +1,39 @@
+---
+description: Enforce Tailwind CSS v4 canonical classes and syntax.
+globs: **/*.{tsx,css}
+alwaysApply: false
+---
+
+# Tailwind CSS v4 Standards
+
+This project uses Tailwind CSS v4. Always use the modern canonical utility classes to avoid IDE warnings and ensure future compatibility.
+
+## Canonical Utility Renames
+
+| Legacy Class (v3) | Canonical Class (v4) |
+| :--- | :--- |
+| `bg-gradient-to-*` | `bg-linear-to-*` |
+| `break-words` | `wrap-break-word` |
+
+### Examples
+
+```tsx
+// ❌ BAD
+<div className="bg-gradient-to-r from-blue-500 to-purple-500 break-words">...</div>
+
+// ✅ GOOD
+<div className="bg-linear-to-r from-blue-500 to-purple-500 wrap-break-word">...</div>
+```
+
+## Gradient Directions
+
+| Legacy Direction | Canonical Direction |
+| :--- | :--- |
+| `bg-gradient-to-t` | `bg-linear-to-t` |
+| `bg-gradient-to-tr` | `bg-linear-to-tr` |
+| `bg-gradient-to-r` | `bg-linear-to-r` |
+| `bg-gradient-to-br` | `bg-linear-to-br` |
+| `bg-gradient-to-b` | `bg-linear-to-b` |
+| `bg-gradient-to-bl` | `bg-linear-to-bl` |
+| `bg-gradient-to-l` | `bg-linear-to-l` |
+| `bg-gradient-to-tl` | `bg-linear-to-tl` |
