@@ -1,8 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useAppSettings, useCategories, useTasks, useTimeEntries, useDailyCapacity } from "../hooks/useData";
 import {
-  db,
   buildStabilizerStackSplit,
   getWaitingTasks,
   isActionable,
@@ -16,6 +15,7 @@ import {
   getTaskActualSeconds,
   getTaskEstimateMinutes,
   isProjectMode,
+  updateTask,
 } from "../db";
 import type { TaskDomain } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
@@ -43,9 +43,9 @@ function formatNextAction(dateStr: string): string {
 }
 
 export default function TodayPage() {
-  const settings = useLiveQuery(() => db.appSettings.get("default"));
-  const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
-  const allTasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
+  const { data: settings } = useAppSettings();
+  const { data: categories = [] } = useCategories();
+  const { data: allTasks = [] } = useTasks();
   const [showModal, setShowModal] = useState(false);
   const [showLogTaskModal, setShowLogTaskModal] = useState(false);
   const [showAllTasksDrawer, setShowAllTasksDrawer] = useState(false);
@@ -58,14 +58,8 @@ export default function TodayPage() {
   const timer = useTimer();
 
   const today = todayDateStr();
-  const stabilizerDailyOverride = useLiveQuery(
-    () => db.dailyCapacity.where("[date+domain]").equals([today, "LIFE_ADMIN"]).first(),
-    [today]
-  );
-  const builderDailyOverride = useLiveQuery(
-    () => db.dailyCapacity.where("[date+domain]").equals([today, "BUSINESS"]).first(),
-    [today]
-  );
+  const { data: stabilizerDailyOverride } = useDailyCapacity(today, "LIFE_ADMIN");
+  const { data: builderDailyOverride } = useDailyCapacity(today, "BUSINESS");
 
   const stabilizerMins = getEffectiveMinutes(settings, stabilizerDailyOverride, "LIFE_ADMIN");
   const builderMins = getEffectiveMinutes(settings, builderDailyOverride, "BUSINESS");
@@ -77,7 +71,7 @@ export default function TodayPage() {
     : (settings?.builderAvailableMinutes ?? 120);
   const isOverridden = !!currentOverride && currentOverride.date === today;
 
-  const timeEntries = useLiveQuery(() => db.timeEntries.toArray()) ?? [];
+  const { data: timeEntries = [] } = useTimeEntries();
   const taskById = useMemo(() => new Map(allTasks.map((t) => [t.id, t])), [allTasks]);
   const spentSecondsByDomain = useMemo(() => {
     const todayStr = today;
@@ -178,7 +172,7 @@ export default function TodayPage() {
   };
 
   const makeActionable = async (taskId: string) => {
-    await db.tasks.update(taskId, {
+    await updateTask(taskId, {
       status: "BACKLOG",
       nextActionAt: undefined,
       pendingReason: undefined,
@@ -187,10 +181,10 @@ export default function TodayPage() {
   };
 
   const pinToToday = async (taskId: string) => {
-    await db.tasks.update(taskId, { status: "TODAY", updatedAt: nowISO() });
+    await updateTask(taskId, { status: "TODAY", updatedAt: nowISO() });
   };
   const removeFromToday = async (taskId: string) => {
-    await db.tasks.update(taskId, { status: "BACKLOG", updatedAt: nowISO() });
+    await updateTask(taskId, { status: "BACKLOG", updatedAt: nowISO() });
   };
 
   const stackCount = tab === "Life" ? stabilizerTasks.length : builderActionable.length;

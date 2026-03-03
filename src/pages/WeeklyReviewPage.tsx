@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db, generateId, nowISO } from "../db";
+import { useTasks, useCategories, useWeeklyReviews, useWins } from "../hooks/useData";
+import { generateId, nowISO, addWeeklyReview } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
 
 const STEPS = [
@@ -14,10 +14,10 @@ const STEPS = [
 ] as const;
 
 export default function WeeklyReviewPage() {
-  const tasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
-  const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
-  const reviews = useLiveQuery(() => db.weeklyReviews.toArray()) ?? [];
-  const allWins = useLiveQuery(() => db.wins.toArray()) ?? [];
+  const { data: tasks = [] } = useTasks();
+  const { data: categories = [] } = useCategories();
+  const { data: reviews = [] } = useWeeklyReviews();
+  const { data: allWins = [] } = useWins();
 
   const [step, setStep] = useState(0);
   const [friction, setFriction] = useState("");
@@ -83,7 +83,7 @@ export default function WeeklyReviewPage() {
   const handleSave = async () => {
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    await db.weeklyReviews.add({
+    await addWeeklyReview({
       id: generateId(),
       weekStart: weekStart.toISOString(),
       answers: { friction, categoryFocus, scariestNextStep },

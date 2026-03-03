@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useCategories, useTasks, useAppSettings, useDailyCapacity } from "../hooks/useData";
 import {
-  db,
   buildStabilizerStackSplit,
   getWaitingTasks,
   isActionable,
@@ -12,6 +11,7 @@ import {
   markTaskArchived,
   getEffectiveMinutes,
   todayDateStr,
+  updateTask,
 } from "../db";
 import type { Task } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
@@ -42,14 +42,11 @@ export default function AllTasksPage() {
   const tabParam = searchParams.get("tab")?.toLowerCase();
   const domainTab: DomainTab = tabParam === "builder" ? "Builder" : "Life";
 
-  const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
-  const allTasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
-  const settings = useLiveQuery(() => db.appSettings.get("default"));
+  const { data: categories = [] } = useCategories();
+  const { data: allTasks = [] } = useTasks();
+  const { data: settings } = useAppSettings();
   const today = todayDateStr();
-  const dailyOverride = useLiveQuery(
-    () => db.dailyCapacity.where("[date+domain]").equals([today, "LIFE_ADMIN"]).first(),
-    [today]
-  );
+  const { data: dailyOverride } = useDailyCapacity(today, "LIFE_ADMIN");
   const availMins = getEffectiveMinutes(settings, dailyOverride, "LIFE_ADMIN");
 
   const [doneOpen, setDoneOpen] = useState(false);
@@ -98,13 +95,13 @@ export default function AllTasksPage() {
   const catMap = new Map(categories.map((c) => [c.id, c]));
 
   const pinTask = async (task: Task) => {
-    await db.tasks.update(task.id, { status: "TODAY", updatedAt: nowISO() });
+    await updateTask(task.id, { status: "TODAY", updatedAt: nowISO() });
   };
   const unpinTask = async (task: Task) => {
-    await db.tasks.update(task.id, { status: "BACKLOG", updatedAt: nowISO() });
+    await updateTask(task.id, { status: "BACKLOG", updatedAt: nowISO() });
   };
   const makeActionable = async (taskId: string) => {
-    await db.tasks.update(taskId, {
+    await updateTask(taskId, {
       status: "BACKLOG",
       nextActionAt: undefined,
       pendingReason: undefined,
@@ -407,7 +404,7 @@ export default function AllTasksPage() {
                           {doneTab === "Archived" && (
                             <button
                               onClick={async () => {
-                                await db.tasks.update(task.id, {
+                                await updateTask(task.id, {
                                   status: "DONE",
                                   updatedAt: nowISO(),
                                 });

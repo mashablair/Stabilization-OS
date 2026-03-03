@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db, generateId, nowISO, todayDateStr, upsertHabitLog } from "../db";
+import { useHabits, useHabitLogs } from "../hooks/useData";
+import { generateId, nowISO, todayDateStr, upsertHabitLog, addHabit as addHabitFn, updateHabit, bulkPutHabits } from "../db";
 import {
   getConsistencyStats,
   getCurrentStreak,
@@ -72,8 +72,9 @@ function dayCellLabel(status: HabitLogStatus): string {
 }
 
 export default function HabitsPage() {
-  const habits = (useLiveQuery(() => db.habits.toArray()) ?? []).sort((a, b) => a.sortOrder - b.sortOrder);
-  const logs = useLiveQuery(() => db.habitLogs.toArray()) ?? [];
+  const { data: habitsRaw = [] } = useHabits();
+  const habits = [...habitsRaw].sort((a, b) => a.sortOrder - b.sortOrder);
+  const { data: logs = [] } = useHabitLogs();
   const [range, setRange] = useState<HabitRange>("MONTH");
   const [showAdd, setShowAdd] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -534,7 +535,7 @@ function AddHabitModal({
       createdAt: now,
       updatedAt: now,
     };
-    await db.habits.add(habit);
+    await addHabitFn(habit);
     onClose();
   };
 
@@ -976,15 +977,15 @@ function ManageHabitsModal({
     const swap = index + dir;
     if (swap < 0 || swap >= next.length) return;
     [next[index], next[swap]] = [next[swap], next[index]];
-    await db.habits.bulkPut(next.map((h, idx) => ({ ...h, sortOrder: idx + 1, updatedAt: nowISO() })));
+    await bulkPutHabits(next.map((h, idx) => ({ ...h, sortOrder: idx + 1, updatedAt: nowISO() })));
   };
 
   const archive = async (habit: Habit) => {
-    await db.habits.update(habit.id, { archivedAt: nowISO(), updatedAt: nowISO() });
+    await updateHabit(habit.id, { archivedAt: nowISO(), updatedAt: nowISO() });
   };
 
   const restore = async (habit: Habit) => {
-    await db.habits.update(habit.id, {
+    await updateHabit(habit.id, {
       archivedAt: undefined,
       sortOrder: active.length + 1,
       updatedAt: nowISO(),
@@ -1115,7 +1116,7 @@ function EditHabitModal({
   const submit = async () => {
     if (!name.trim()) return;
     const now = nowISO();
-    await db.habits.update(habit.id, {
+    await updateHabit(habit.id, {
       name: name.trim(),
       type,
       scheduleType,

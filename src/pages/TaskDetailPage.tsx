@@ -1,7 +1,7 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useTask, useCategories, useTimeEntriesForTask, rowToTask } from "../hooks/useData";
+import { supabase } from "../lib/supabase";
 import {
-  db,
   generateId,
   nowISO,
   markTaskDone,
@@ -11,6 +11,11 @@ import {
   getTaskEstimateMinutes,
   isProjectMode,
   stripSubtaskTimeFields,
+  updateTask,
+  addTimeEntry,
+  deleteTimeEntry,
+  deleteTimeEntriesForTask,
+  deleteTask as deleteTaskFn,
   type Subtask,
 } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
@@ -33,13 +38,10 @@ const PRIORITY_COLORS: Record<number, string> = {
 export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const task = useLiveQuery(() => (id ? db.tasks.get(id) : undefined), [id]);
-  const allCategories = useLiveQuery(() => db.categories.toArray()) ?? [];
+  const { data: task } = useTask(id);
+  const { data: allCategories = [] } = useCategories();
   const categories = getCategoriesByDomain(allCategories, task?.domain ?? "LIFE_ADMIN");
-  const timeEntries = useLiveQuery(
-    () => (id ? db.timeEntries.where("taskId").equals(id).toArray() : []),
-    [id]
-  ) ?? [];
+  const { data: timeEntries = [] } = useTimeEntriesForTask(id);
   const timer = useTimer();
   const [newSubtask, setNewSubtask] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -103,7 +105,7 @@ export default function TaskDetailPage() {
   const isPaused = isFocusedTimer && timer.isPaused;
 
   const update = (fields: Partial<typeof task>) =>
-    db.tasks.update(task.id, { ...fields, updatedAt: nowISO() });
+    updateTask(task.id, { ...fields, updatedAt: nowISO() });
 
   const sumSubtaskEstimate = (subtasks: Subtask[]) =>
     subtasks.reduce((sum, subtask) => sum + (subtask.estimateMinutes ?? 0), 0);
@@ -190,7 +192,7 @@ export default function TaskDetailPage() {
 
     const capturedEstimate = formatMinutes(task.estimateMinutes ?? 0);
     const capturedActual = formatMinutes(Math.round(task.actualSecondsTotal / 60));
-    await db.timeEntries.where("taskId").equals(task.id).delete();
+    await deleteTimeEntriesForTask(task.id);
 
     const updatedSubtasks = task.subtasks.map((subtask) => ({
       ...subtask,
@@ -217,8 +219,9 @@ export default function TaskDetailPage() {
     if (timer.activeTaskId === task.id) {
       await timer.stopTimer();
     }
-    const freshTask = await db.tasks.get(task.id);
-    if (!freshTask) return;
+    const { data: freshRow } = await supabase.from("tasks").select("*").eq("id", task.id).single();
+    if (!freshRow) return;
+    const freshTask = rowToTask(freshRow);
     let totalEstimate = sumSubtaskEstimate(freshTask.subtasks);
     let totalActual = sumSubtaskActual(freshTask.subtasks);
     if (totalActual === 0 && timeEntries.length > 0) {
@@ -229,7 +232,7 @@ export default function TaskDetailPage() {
     if (totalEstimate === 0 && (freshTask.estimateMinutes ?? 0) > 0) {
       totalEstimate = freshTask.estimateMinutes!;
     }
-    await db.timeEntries.where("taskId").equals(task.id).delete();
+    await deleteTimeEntriesForTask(task.id);
     await update({
       timeTrackingMode: "TASK",
       estimateMinutes: totalEstimate || undefined,
@@ -244,13 +247,12 @@ export default function TaskDetailPage() {
     });
   };
 
-  const deleteTask = async () => {
+  const handleDeleteTask = async () => {
     if (!confirm("Delete this task permanently?")) return;
     if (timer.activeTaskId === task.id) {
       await timer.stopTimer();
     }
-    await db.tasks.delete(task.id);
-    await db.timeEntries.where("taskId").equals(task.id).delete();
+    await deleteTaskFn(task.id);
     navigate(-1);
   };
 
@@ -282,7 +284,7 @@ export default function TaskDetailPage() {
     const now = nowISO();
     const startAt = new Date(Date.now() - seconds * 1000).toISOString();
     const entryId = generateId();
-    await db.timeEntries.add({
+    await addTimeEntry({
       id: entryId,
       taskId: task.id,
       ...(isProjectTask ? { subtaskId: focusSubtask?.id } : {}),
@@ -296,13 +298,13 @@ export default function TaskDetailPage() {
           ? { ...subtask, actualSecondsTotal: (subtask.actualSecondsTotal ?? 0) + seconds }
           : subtask
       );
-      await db.tasks.update(task.id, {
+      await updateTask(task.id, {
         subtasks: updatedSubtasks,
         actualSecondsTotal: sumSubtaskActual(updatedSubtasks),
         updatedAt: now,
       });
     } else {
-      await db.tasks.update(task.id, {
+      await updateTask(task.id, {
         actualSecondsTotal: task.actualSecondsTotal + seconds,
         updatedAt: now,
       });
@@ -311,7 +313,7 @@ export default function TaskDetailPage() {
   };
 
   const removeSession = async (entry: (typeof completedEntries)[0]) => {
-    await db.timeEntries.delete(entry.id);
+    await deleteTimeEntry(entry.id);
     if (isProjectTask && entry.subtaskId) {
       const updatedSubtasks = task.subtasks.map((subtask) =>
         subtask.id === entry.subtaskId
@@ -321,14 +323,14 @@ export default function TaskDetailPage() {
             }
           : subtask
       );
-      await db.tasks.update(task.id, {
+      await updateTask(task.id, {
         subtasks: updatedSubtasks,
         actualSecondsTotal: sumSubtaskActual(updatedSubtasks),
         updatedAt: nowISO(),
       });
       return;
     }
-    await db.tasks.update(task.id, {
+    await updateTask(task.id, {
       actualSecondsTotal: Math.max(0, task.actualSecondsTotal - entry.seconds),
       updatedAt: nowISO(),
     });
@@ -979,7 +981,7 @@ export default function TaskDetailPage() {
           </div>
 
           <button
-            onClick={deleteTask}
+            onClick={handleDeleteTask}
             className="w-full text-red-500 font-medium py-3 text-sm flex items-center justify-center gap-2 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
           >
             <span className="material-symbols-outlined text-sm">delete</span>

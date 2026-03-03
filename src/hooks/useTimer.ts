@@ -1,9 +1,24 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { db, generateId, nowISO, type Subtask, type TimerState, type TimeEntry } from "../db";
-import { useLiveQuery } from "dexie-react-hooks";
+import {
+  generateId,
+  nowISO,
+  addTimeEntry,
+  updateTimeEntry,
+  updateTask,
+  getTimerState,
+  putTimerState,
+  updateTimerState,
+  deleteTimerState,
+  type Subtask,
+  type TimerState,
+} from "../db";
+import { useTimerState as useTimerStateQuery } from "./useData";
+import { supabase } from "../lib/supabase";
+import { rowToTask } from "./useData";
+import { queryClient } from "../lib/queryClient";
 
 export function useTimer() {
-  const timerState = useLiveQuery(() => db.timerState.get("active"));
+  const { data: timerState } = useTimerStateQuery();
   const [elapsed, setElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -34,28 +49,27 @@ export function useTimer() {
 
   const startTimer = useCallback(
     async (taskId: string, subtaskId?: string) => {
+      const currentState = await getTimerState();
       const sameTarget =
-        timerState?.taskId === taskId && (timerState?.subtaskId ?? undefined) === (subtaskId ?? undefined);
-      if (timerState?.taskId && !sameTarget) {
+        currentState?.taskId === taskId &&
+        (currentState?.subtaskId ?? undefined) === (subtaskId ?? undefined);
+      if (currentState?.taskId && !sameTarget) {
         await stopTimer();
       }
 
-      const existing = await db.timerState.get("active");
+      const existing = await getTimerState();
       const sameExistingTarget =
         existing?.taskId === taskId &&
         (existing?.subtaskId ?? undefined) === (subtaskId ?? undefined);
       if (existing && sameExistingTarget && existing.pausedAt) {
-        await db.timerState.update("active", {
-          startedAt: nowISO(),
-          pausedAt: undefined,
-        });
+        await updateTimerState({ startedAt: nowISO(), pausedAt: undefined });
         return;
       }
 
       const entryId = generateId();
       const now = nowISO();
 
-      await db.timeEntries.add({
+      await addTimeEntry({
         id: entryId,
         taskId,
         subtaskId,
@@ -63,9 +77,9 @@ export function useTimer() {
         seconds: 0,
       });
 
-      await db.tasks.update(taskId, { status: "IN_PROGRESS", updatedAt: now });
+      await updateTask(taskId, { status: "IN_PROGRESS", updatedAt: now });
 
-      await db.timerState.put({
+      await putTimerState({
         id: "active",
         taskId,
         subtaskId,
@@ -79,27 +93,24 @@ export function useTimer() {
 
   const pauseTimer = useCallback(
     async (pauseReason?: string) => {
-      const state = await db.timerState.get("active");
+      const state = await getTimerState();
       if (!state || state.pausedAt) return;
 
       const started = new Date(state.startedAt).getTime();
       const diff = Math.floor((Date.now() - started) / 1000);
       const total = state.accumulatedSeconds + diff;
 
-      await db.timerState.update("active", {
-        pausedAt: nowISO(),
-        accumulatedSeconds: total,
-      });
+      await updateTimerState({ pausedAt: nowISO(), accumulatedSeconds: total });
 
       if (pauseReason) {
-        await db.timeEntries.update(state.timeEntryId, { pauseReason });
+        await updateTimeEntry(state.timeEntryId, { pauseReason });
       }
     },
     []
   );
 
   const stopTimer = useCallback(async () => {
-    const state = await db.timerState.get("active");
+    const state = await getTimerState();
     if (!state) return;
 
     let totalSeconds = state.accumulatedSeconds;
@@ -112,13 +123,18 @@ export function useTimer() {
     totalSeconds = Math.min(totalSeconds, maxSeconds);
 
     const now = nowISO();
-    await db.timeEntries.update(state.timeEntryId, {
+    await updateTimeEntry(state.timeEntryId, {
       endAt: now,
       seconds: totalSeconds,
     });
 
-    const task = await db.tasks.get(state.taskId);
-    if (task) {
+    const { data: taskRow } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("id", state.taskId)
+      .single();
+    if (taskRow) {
+      const task = rowToTask(taskRow);
       if (task.timeTrackingMode === "PROJECT" && state.subtaskId) {
         const updatedSubtasks = task.subtasks.map((subtask) =>
           subtask.id === state.subtaskId
@@ -127,26 +143,25 @@ export function useTimer() {
         );
         const hasSubtask = updatedSubtasks.some((subtask) => subtask.id === state.subtaskId);
         if (hasSubtask) {
-          await db.tasks.update(state.taskId, {
+          await updateTask(state.taskId, {
             subtasks: updatedSubtasks,
             actualSecondsTotal: sumSubtaskActual(updatedSubtasks),
-            updatedAt: now,
           });
         } else {
-          await db.tasks.update(state.taskId, {
+          await updateTask(state.taskId, {
             actualSecondsTotal: task.actualSecondsTotal + totalSeconds,
-            updatedAt: now,
           });
         }
       } else {
-        await db.tasks.update(state.taskId, {
+        await updateTask(state.taskId, {
           actualSecondsTotal: task.actualSecondsTotal + totalSeconds,
-          updatedAt: now,
         });
       }
     }
 
-    await db.timerState.delete("active");
+    await deleteTimerState();
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["timeEntries"] });
   }, []);
 
   return {

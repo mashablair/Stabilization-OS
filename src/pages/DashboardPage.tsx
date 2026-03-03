@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../db";
+import { useAppSettings, useCategories, useTasks, useTimeEntries } from "../hooks/useData";
 import type { TaskDomain } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
 import {
@@ -19,10 +18,10 @@ type FilterTab = "All" | "Life" | "Builder";
 
 export default function DashboardPage() {
   const [filterTab, setFilterTab] = useState<FilterTab>("All");
-  const settings = useLiveQuery(() => db.appSettings.get("default"));
-  const tasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
-  const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
-  const timeEntries = useLiveQuery(() => db.timeEntries.toArray()) ?? [];
+  const { data: settings } = useAppSettings();
+  const { data: tasks = [] } = useTasks();
+  const { data: categories = [] } = useCategories();
+  const { data: timeEntries = [] } = useTimeEntries();
   const isDark = settings?.darkMode ?? false;
 
   const chartTooltipStyle = useMemo(

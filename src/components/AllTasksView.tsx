@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db, buildStabilizerStackSplit, isActionable, nowISO, getEffectiveMinutes, todayDateStr } from "../db";
+import { useCategories, useTasks, useAppSettings, useDailyCapacity } from "../hooks/useData";
+import { buildStabilizerStackSplit, isActionable, nowISO, getEffectiveMinutes, todayDateStr, updateTask } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
 import type { Task } from "../db";
 import LogTaskModal from "./LogTaskModal";
@@ -16,14 +16,11 @@ interface Props {
 }
 
 export default function AllTasksView({ tab, embedded = false, onClose }: Props) {
-  const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
-  const allTasks = useLiveQuery(() => db.tasks.toArray()) ?? [];
-  const settings = useLiveQuery(() => db.appSettings.get("default"));
+  const { data: categories = [] } = useCategories();
+  const { data: allTasks = [] } = useTasks();
+  const { data: settings } = useAppSettings();
   const today = todayDateStr();
-  const dailyOverride = useLiveQuery(
-    () => db.dailyCapacity.where("[date+domain]").equals([today, "LIFE_ADMIN"]).first(),
-    [today]
-  );
+  const { data: dailyOverride } = useDailyCapacity(today, "LIFE_ADMIN");
   const availMins = getEffectiveMinutes(settings, dailyOverride, "LIFE_ADMIN");
 
   const stabilizerPool = allTasks.filter(
@@ -59,14 +56,14 @@ export default function AllTasksView({ tab, embedded = false, onClose }: Props) 
   const catMap = new Map(categories.map((c) => [c.id, c]));
 
   const pinTask = async (task: Task) => {
-    await db.tasks.update(task.id, {
+    await updateTask(task.id, {
       status: "TODAY",
       updatedAt: nowISO(),
     });
   };
 
   const unpinTask = async (task: Task) => {
-    await db.tasks.update(task.id, {
+    await updateTask(task.id, {
       status: "BACKLOG",
       updatedAt: nowISO(),
     });

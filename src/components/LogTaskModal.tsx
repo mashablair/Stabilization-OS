@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useCategories } from "../hooks/useData";
 import {
-  db,
   generateId,
   nowISO,
   todayDateStr,
   getCategoriesByDomain,
+  addTask,
+  addTimeEntry,
   type Task,
   type TaskDomain,
 } from "../db";
@@ -25,7 +26,7 @@ export default function LogTaskModal({
   defaultDomain = "LIFE_ADMIN",
   defaultDate,
 }: Props) {
-  const allCategories = useLiveQuery(() => db.categories.toArray()) ?? [];
+  const { data: allCategories = [] } = useCategories();
   const [domain, setDomain] = useState<TaskDomain>(defaultDomain);
   const categories = getCategoriesByDomain(allCategories, domain);
   const [title, setTitle] = useState("");
@@ -76,8 +77,8 @@ export default function LogTaskModal({
       subtasks: [],
     };
 
-    await db.tasks.add(task);
-    await db.timeEntries.add({
+    await addTask(task);
+    await addTimeEntry({
       id: entryId,
       taskId,
       startAt,

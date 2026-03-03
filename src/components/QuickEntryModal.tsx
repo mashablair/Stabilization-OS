@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db, generateId, nowISO, getCategoriesByDomain, type Task, type TaskDomain } from "../db";
+import { useCategories } from "../hooks/useData";
+import { generateId, nowISO, getCategoriesByDomain, addTask, type Task, type TaskDomain } from "../db";
 
 interface Props {
   open: boolean;
@@ -11,7 +11,7 @@ interface Props {
 }
 
 export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_ADMIN", addToTodayStack = false }: Props) {
-  const allCategories = useLiveQuery(() => db.categories.toArray()) ?? [];
+  const { data: allCategories = [] } = useCategories();
   const [domain, setDomain] = useState<TaskDomain>(defaultDomain);
   const categories = getCategoriesByDomain(allCategories, domain);
   const [title, setTitle] = useState("");
@@ -48,7 +48,7 @@ export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_A
       subtasks: [],
     };
 
-    await db.tasks.add(task);
+    await addTask(task);
     setTitle("");
     setEstimate(25);
     onClose();

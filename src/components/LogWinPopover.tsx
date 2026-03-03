@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db, generateId, nowISO, todayDateStr, type Win, type WinTag } from "../db";
+import { useWinsByDate } from "../hooks/useData";
+import { generateId, nowISO, todayDateStr, addWin, type WinTag } from "../db";
 
 const WIN_TAGS: WinTag[] = ["life", "biz", "vitality", "community"];
 
@@ -18,10 +18,7 @@ export default function LogWinPopover({ open, onClose, anchorRef }: Props) {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const today = todayDateStr();
-  const winsToday = useLiveQuery(
-    () => db.wins.where("date").equals(today).sortBy("createdAt"),
-    [today, open]
-  ) ?? [];
+  const { data: winsToday = [] } = useWinsByDate(today);
 
   useEffect(() => {
     if (open) {
@@ -58,7 +55,7 @@ export default function LogWinPopover({ open, onClose, anchorRef }: Props) {
   const handleSubmit = async () => {
     if (!text.trim()) return;
     const winDate = date.trim() || today;
-    await db.wins.add({
+    await addWin({
       id: generateId(),
       text: text.trim(),
       date: winDate,
