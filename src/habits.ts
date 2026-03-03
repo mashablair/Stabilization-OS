@@ -2,6 +2,7 @@ export type HabitType = "CHECK" | "COUNT" | "TIME";
 export type HabitScheduleType = "DAILY" | "WEEKDAYS" | "EVERY_N_DAYS" | "TIMES_PER_WEEK";
 export type HabitLogStatus = "DONE" | "PARTIAL" | "SKIP" | "NONE";
 export type HabitRange = "WEEK" | "MONTH" | "THREE_MONTHS";
+export type HabitTimeOfDay = "MORNING" | "ANYTIME" | "EVENING";
 
 export interface Habit {
   id: string;
@@ -14,6 +15,7 @@ export interface Habit {
   goalTarget?: number;
   unit?: string;
   startDate: string;
+  timeOfDay: HabitTimeOfDay;
   showInToday: boolean;
   allowPartial: boolean;
   allowSkip: boolean;

@@ -17,6 +17,7 @@ function makeHabit(overrides: Partial<Habit> = {}): Habit {
     type: "CHECK",
     scheduleType: "DAILY",
     startDate: "2026-02-01",
+    timeOfDay: "ANYTIME",
     showInToday: true,
     allowPartial: false,
     allowSkip: true,

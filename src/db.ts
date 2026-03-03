@@ -223,6 +223,25 @@ db.version(6).stores({
   habitLogs: "id, habitId, date, [habitId+date], status",
 });
 
+db.version(7).stores({
+  categories: "id, kind, domain",
+  tasks: "id, categoryId, status, priority, domain",
+  timeEntries: "id, taskId",
+  weeklyReviews: "id, weekStart",
+  timerState: "id",
+  appSettings: "id",
+  dailyCapacity: "id, [date+domain]",
+  wins: "id, date, createdAt",
+  habits: "id, archivedAt, sortOrder, showInToday, timeOfDay",
+  habitLogs: "id, habitId, date, [habitId+date], status",
+}).upgrade(tx => {
+  return tx.table("habits").toCollection().modify((habit: { timeOfDay?: string }) => {
+    if (!habit.timeOfDay) {
+      habit.timeOfDay = "ANYTIME";
+    }
+  });
+});
+
 export { db };
 
 export function generateId(): string {

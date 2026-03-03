@@ -11,6 +11,7 @@ import {
   type HabitLogStatus,
   type HabitRange,
   type HabitScheduleType,
+  type HabitTimeOfDay,
   type HabitType,
 } from "../habits";
 
@@ -33,7 +34,17 @@ const HABIT_ICONS: string[] = [
   "timer", "alarm", "event", "today", "trending_up", "insights", "bar_chart", "pie_chart",
 ];
 
+const TIME_OF_DAY_OPTIONS: Array<{ value: HabitTimeOfDay; label: string }> = [
+  { value: "MORNING", label: "Morning" },
+  { value: "ANYTIME", label: "Anytime" },
+  { value: "EVENING", label: "Evening" },
+];
+
 type DayEditorState = { open: boolean; date: string };
+
+function getHabitTimeOfDay(habit: Habit): HabitTimeOfDay {
+  return habit.timeOfDay ?? "ANYTIME";
+}
 
 function formatDateLabel(dateStr: string): string {
   return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, {
@@ -67,6 +78,12 @@ export default function HabitsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [dayEditor, setDayEditor] = useState<DayEditorState>({ open: false, date: todayDateStr() });
+  const [historyTimeFilter, setHistoryTimeFilter] = useState<"ALL" | HabitTimeOfDay>("ALL");
+  const [todaySectionsOpen, setTodaySectionsOpen] = useState<Record<HabitTimeOfDay, boolean>>({
+    MORNING: true,
+    ANYTIME: false,
+    EVENING: false,
+  });
 
   const activeHabits = habits.filter((h) => !h.archivedAt);
   const today = todayDateStr();
@@ -83,7 +100,18 @@ export default function HabitsPage() {
   const getLog = (habitId: string, date: string) => logsByHabitAndDate.get(`${habitId}|${date}`);
 
   const todayHabits = activeHabits.filter((habit) => habit.showInToday && isHabitScheduledOnDate(habit, today));
+  const todayHabitsByTime = useMemo(() => {
+    return {
+      MORNING: todayHabits.filter((habit) => getHabitTimeOfDay(habit) === "MORNING"),
+      ANYTIME: todayHabits.filter((habit) => getHabitTimeOfDay(habit) === "ANYTIME"),
+      EVENING: todayHabits.filter((habit) => getHabitTimeOfDay(habit) === "EVENING"),
+    };
+  }, [todayHabits]);
   const todayCompleted = todayHabits.filter((habit) => isDoneEquivalent(habit, getLog(habit.id, today))).length;
+  const historyHabits =
+    historyTimeFilter === "ALL"
+      ? activeHabits
+      : activeHabits.filter((habit) => getHabitTimeOfDay(habit) === historyTimeFilter);
 
   const setStatus = async (habit: Habit, date: string, status: HabitLogStatus) => {
     const existing = getLog(habit.id, date);
@@ -156,80 +184,113 @@ export default function HabitsPage() {
           <p className="text-sm text-slate-500 dark:text-slate-400">No habits scheduled for today.</p>
         ) : (
           <div className="space-y-3">
-            {todayHabits.map((habit) => {
-              const log = getLog(habit.id, today);
-              const value = log?.value ?? 0;
+            {TIME_OF_DAY_OPTIONS.map((section) => {
+              const sectionHabits = todayHabitsByTime[section.value];
+              const isOpen = todaySectionsOpen[section.value];
               return (
-                <div key={habit.id} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col gap-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="material-symbols-outlined text-base" style={{ color: habit.color ?? "#a855f7" }}>
-                        {habit.icon ?? "check_circle"}
-                      </span>
-                      <p className="font-semibold truncate">{habit.name}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setStatus(habit, today, log?.status === "DONE" ? "NONE" : "DONE")}
-                        className={`size-7 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
-                          log?.status === "DONE"
-                            ? "border-transparent text-white shadow-md"
-                            : "border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500"
-                        }`}
-                        style={log?.status === "DONE" ? { background: habit.color ?? "#22c55e" } : undefined}
-                        title={log?.status === "DONE" ? "Uncheck to clear" : "Mark done"}
-                      >
-                        {log?.status === "DONE" ? (
-                          <span className="material-symbols-outlined text-base font-bold">check</span>
-                        ) : null}
-                      </button>
-                      {habit.allowPartial && (
-                        <button
-                          type="button"
-                          onClick={() => setStatus(habit, today, "PARTIAL")}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${log?.status === "PARTIAL" ? "bg-amber-100 dark:bg-amber-900/40 border-amber-400 text-amber-700 dark:text-amber-300" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
-                        >
-                          Partial
-                        </button>
-                      )}
-                      {habit.allowSkip && (
-                        <button
-                          type="button"
-                          onClick={() => setStatus(habit, today, "SKIP")}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${log?.status === "SKIP" ? "bg-slate-200 dark:bg-slate-700 border-slate-400 text-slate-700 dark:text-slate-200" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
-                        >
-                          Skip
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {habit.type !== "CHECK" && (
+                <div key={section.value} className="rounded-xl border border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTodaySectionsOpen((prev) => ({ ...prev, [section.value]: !prev[section.value] }))
+                    }
+                    className="w-full px-3 py-2.5 flex items-center justify-between gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                  >
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="size-7 rounded-lg border border-slate-200 dark:border-slate-700"
-                        onClick={() => setNumericValue(habit, today, value - 1)}
-                      >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        value={value}
-                        min={0}
-                        onChange={(e) => setNumericValue(habit, today, Number(e.target.value) || 0)}
-                        className="w-18 text-center rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent px-2 py-1.5 text-sm"
-                      />
-                      <button
-                        type="button"
-                        className="size-7 rounded-lg border border-slate-200 dark:border-slate-700"
-                        onClick={() => setNumericValue(habit, today, value + 1)}
-                      >
-                        +
-                      </button>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
-                        goal {habit.goalTarget ?? 0} {habit.unit ?? ""}
+                      <span className={`material-symbols-outlined text-sm transition-transform ${isOpen ? "rotate-90" : ""}`}>
+                        chevron_right
                       </span>
+                      <p className="text-sm font-bold">{section.label}</p>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      {sectionHabits.length} habit{sectionHabits.length === 1 ? "" : "s"}
+                    </p>
+                  </button>
+                  {isOpen && (
+                    <div className="p-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                      {sectionHabits.length === 0 ? (
+                        <p className="text-sm text-slate-500 dark:text-slate-400">No habits in this section.</p>
+                      ) : (
+                        sectionHabits.map((habit) => {
+                          const log = getLog(habit.id, today);
+                          const value = log?.value ?? 0;
+                          return (
+                            <div key={habit.id} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col gap-2">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="material-symbols-outlined text-base" style={{ color: habit.color ?? "#a855f7" }}>
+                                    {habit.icon ?? "check_circle"}
+                                  </span>
+                                  <p className="font-semibold truncate">{habit.name}</p>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setStatus(habit, today, log?.status === "DONE" ? "NONE" : "DONE")}
+                                    className={`size-7 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
+                                      log?.status === "DONE"
+                                        ? "border-transparent text-white shadow-md"
+                                        : "border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500"
+                                    }`}
+                                    style={log?.status === "DONE" ? { background: habit.color ?? "#22c55e" } : undefined}
+                                    title={log?.status === "DONE" ? "Uncheck to clear" : "Mark done"}
+                                  >
+                                    {log?.status === "DONE" ? (
+                                      <span className="material-symbols-outlined text-base font-bold">check</span>
+                                    ) : null}
+                                  </button>
+                                  {habit.allowPartial && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setStatus(habit, today, "PARTIAL")}
+                                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${log?.status === "PARTIAL" ? "bg-amber-100 dark:bg-amber-900/40 border-amber-400 text-amber-700 dark:text-amber-300" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                                    >
+                                      Partial
+                                    </button>
+                                  )}
+                                  {habit.allowSkip && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setStatus(habit, today, "SKIP")}
+                                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${log?.status === "SKIP" ? "bg-slate-200 dark:bg-slate-700 border-slate-400 text-slate-700 dark:text-slate-200" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                                    >
+                                      Skip
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              {habit.type !== "CHECK" && (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    className="size-7 rounded-lg border border-slate-200 dark:border-slate-700"
+                                    onClick={() => setNumericValue(habit, today, value - 1)}
+                                  >
+                                    -
+                                  </button>
+                                  <input
+                                    type="number"
+                                    value={value}
+                                    min={0}
+                                    onChange={(e) => setNumericValue(habit, today, Number(e.target.value) || 0)}
+                                    className="w-18 text-center rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent px-2 py-1.5 text-sm"
+                                  />
+                                  <button
+                                    type="button"
+                                    className="size-7 rounded-lg border border-slate-200 dark:border-slate-700"
+                                    onClick={() => setNumericValue(habit, today, value + 1)}
+                                  >
+                                    +
+                                  </button>
+                                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                                    goal {habit.goalTarget ?? 0} {habit.unit ?? ""}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   )}
                 </div>
@@ -240,7 +301,7 @@ export default function HabitsPage() {
       </section>
 
       <section className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
             {([
               { key: "WEEK", label: "Week" },
@@ -252,6 +313,23 @@ export default function HabitsPage() {
                 type="button"
                 onClick={() => setRange(item.key)}
                 className={`px-4 py-2 text-sm font-semibold ${range === item.key ? "bg-primary text-white" : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            {([
+              { key: "ALL", label: "All" },
+              { key: "MORNING", label: "Morning" },
+              { key: "ANYTIME", label: "Anytime" },
+              { key: "EVENING", label: "Evening" },
+            ] as const).map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setHistoryTimeFilter(item.key)}
+                className={`px-3 py-2 text-xs font-semibold ${historyTimeFilter === item.key ? "bg-primary text-white" : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
               >
                 {item.label}
               </button>
@@ -289,7 +367,7 @@ export default function HabitsPage() {
                 </div>
               </div>
 
-              {activeHabits.map((habit) => {
+              {historyHabits.map((habit) => {
                 const habitLogsByDate = new Map<string, HabitLog>();
                 const allHabitLogsByDate = new Map<string, HabitLog>();
                 for (const log of logs) {
@@ -357,9 +435,11 @@ export default function HabitsPage() {
                 );
               })}
 
-              {activeHabits.length === 0 && (
+              {historyHabits.length === 0 && (
                 <div className="p-10 text-center text-slate-500 dark:text-slate-400">
-                  Add your first habit to start tracking consistency.
+                  {activeHabits.length === 0
+                    ? "Add your first habit to start tracking consistency."
+                    : "No habits match this time-of-day filter."}
                 </div>
               )}
             </div>
@@ -419,6 +499,7 @@ function AddHabitModal({
   const [goalTarget, setGoalTarget] = useState(1);
   const [unit, setUnit] = useState("");
   const [showInToday, setShowInToday] = useState(true);
+  const [timeOfDay, setTimeOfDay] = useState<HabitTimeOfDay>("ANYTIME");
   const [allowPartial, setAllowPartial] = useState(false);
   const [allowSkip, setAllowSkip] = useState(true);
   const [startDate, setStartDate] = useState(todayDateStr());
@@ -443,6 +524,7 @@ function AddHabitModal({
       goalTarget: type === "CHECK" ? undefined : goalTarget,
       unit: type === "CHECK" ? undefined : unit.trim() || undefined,
       startDate,
+      timeOfDay,
       showInToday,
       allowPartial: type === "CHECK" ? allowPartial : true,
       allowSkip,
@@ -490,6 +572,8 @@ function AddHabitModal({
           setGoalTarget={setGoalTarget}
           unit={unit}
           setUnit={setUnit}
+          timeOfDay={timeOfDay}
+          setTimeOfDay={setTimeOfDay}
           showInToday={showInToday}
           setShowInToday={setShowInToday}
           allowPartial={allowPartial}
@@ -538,6 +622,8 @@ interface HabitFormFieldsProps {
   setGoalTarget: (v: number) => void;
   unit: string;
   setUnit: (v: string) => void;
+  timeOfDay: HabitTimeOfDay;
+  setTimeOfDay: (v: HabitTimeOfDay) => void;
   showInToday: boolean;
   setShowInToday: (v: boolean) => void;
   allowPartial: boolean;
@@ -573,6 +659,8 @@ function HabitFormFields({
   setGoalTarget,
   unit,
   setUnit,
+  timeOfDay,
+  setTimeOfDay,
   showInToday,
   setShowInToday,
   allowPartial,
@@ -652,6 +740,21 @@ function HabitFormFields({
           <option value="WEEKDAYS">Specific weekdays</option>
           <option value="EVERY_N_DAYS">Every N days</option>
           <option value="TIMES_PER_WEEK">X times per week</option>
+        </select>
+      </label>
+
+      <label className="block">
+        <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Time of day</span>
+        <select
+          value={timeOfDay}
+          onChange={(e) => setTimeOfDay(e.target.value as HabitTimeOfDay)}
+          className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-2.5"
+        >
+          {TIME_OF_DAY_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </label>
 
@@ -974,6 +1077,7 @@ function EditHabitModal({
   const [goalTarget, setGoalTarget] = useState(1);
   const [unit, setUnit] = useState("");
   const [showInToday, setShowInToday] = useState(true);
+  const [timeOfDay, setTimeOfDay] = useState<HabitTimeOfDay>("ANYTIME");
   const [allowPartial, setAllowPartial] = useState(false);
   const [allowSkip, setAllowSkip] = useState(true);
   const [startDate, setStartDate] = useState(todayDateStr());
@@ -992,6 +1096,7 @@ function EditHabitModal({
       setTimesPerWeek(habit.timesPerWeek ?? 3);
       setGoalTarget(habit.goalTarget ?? 1);
       setUnit(habit.unit ?? "");
+      setTimeOfDay(habit.timeOfDay ?? "ANYTIME");
       setShowInToday(habit.showInToday);
       setAllowPartial(habit.allowPartial);
       setAllowSkip(habit.allowSkip);
@@ -1020,6 +1125,7 @@ function EditHabitModal({
       goalTarget: type === "CHECK" ? undefined : goalTarget,
       unit: type === "CHECK" ? undefined : unit.trim() || undefined,
       startDate,
+      timeOfDay,
       showInToday,
       allowPartial: type === "CHECK" ? allowPartial : true,
       allowSkip,
@@ -1064,6 +1170,8 @@ function EditHabitModal({
           setGoalTarget={setGoalTarget}
           unit={unit}
           setUnit={setUnit}
+          timeOfDay={timeOfDay}
+          setTimeOfDay={setTimeOfDay}
           showInToday={showInToday}
           setShowInToday={setShowInToday}
           allowPartial={allowPartial}
