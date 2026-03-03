@@ -92,6 +92,10 @@ export default function WinsPage() {
   const [newText, setNewText] = useState("");
   const [newDate, setNewDate] = useState("");
   const [newTags, setNewTags] = useState<WinTag[]>([]);
+  const [editingWinId, setEditingWinId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editTags, setEditTags] = useState<WinTag[]>([]);
 
   const filteredWins = useMemo(() => {
     if (!search.trim()) return wins;
@@ -127,6 +131,36 @@ export default function WinsPage() {
 
   const toggleTag = (tag: WinTag) => {
     setNewTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const startEditing = (win: Win) => {
+    setEditingWinId(win.id);
+    setEditText(win.text);
+    setEditDate(win.date);
+    setEditTags(win.tags);
+  };
+
+  const cancelEditing = () => {
+    setEditingWinId(null);
+    setEditText("");
+    setEditDate("");
+    setEditTags([]);
+  };
+
+  const handleUpdateWin = async () => {
+    if (!editingWinId || !editText.trim()) return;
+    await db.wins.update(editingWinId, {
+      text: editText.trim(),
+      date: editDate.trim() || todayDateStr(),
+      tags: editTags,
+    });
+    cancelEditing();
+  };
+
+  const toggleEditTag = (tag: WinTag) => {
+    setEditTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
   };
@@ -283,39 +317,113 @@ export default function WinsPage() {
           )}
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-4">
           {grouped.keys.map((key) => (
             <section key={key}>
-              <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-4">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2">
                 {period === "week" ? formatWeekLabel(key) : key}
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-1.5">
                 {(grouped.map.get(key) ?? []).map((win) => (
                   <div
                     key={win.id}
-                    className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 flex items-start justify-between gap-4"
+                    className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 px-3 py-2 flex items-center justify-between gap-3"
                   >
-                    <p className="font-medium flex-1">{win.text}</p>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {win.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {win.tags.map((t) => (
-                            <span
-                              key={t}
-                              className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-primary/10 text-primary"
-                            >
-                              {t}
-                            </span>
-                          ))}
+                    {editingWinId === win.id ? (
+                      <div className="flex-1 space-y-4">
+                        <div>
+                          <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 block mb-1">
+                            What did you accomplish?
+                          </label>
+                          <input
+                            type="text"
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleUpdateWin()}
+                            className="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border-0 focus:ring-2 focus:ring-primary"
+                            autoFocus
+                          />
                         </div>
-                      )}
-                      <span className="text-xs text-slate-400">
-                        {new Date(win.date).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </span>
-                    </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 block mb-1">
+                            Date
+                          </label>
+                          <input
+                            type="date"
+                            value={editDate}
+                            onChange={(e) => setEditDate(e.target.value)}
+                            className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border-0 focus:ring-2 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 block mb-1">
+                            Tags
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {WIN_TAGS.map((tag) => (
+                              <button
+                                key={tag}
+                                type="button"
+                                onClick={() => toggleEditTag(tag)}
+                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                                  editTags.includes(tag)
+                                    ? "bg-primary/20 text-primary border border-primary/40"
+                                    : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 border border-transparent"
+                                }`}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleUpdateWin}
+                            disabled={!editText.trim()}
+                            className="px-4 py-2 rounded-xl bg-gradient-accent text-white font-bold text-sm disabled:opacity-40 hover:opacity-90 transition-all"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={cancelEditing}
+                            className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-medium text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="font-medium text-sm flex-1">{win.text}</p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {win.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {win.tags.map((t) => (
+                                <span
+                                  key={t}
+                                  className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-primary/10 text-primary"
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <span className="text-xs text-slate-400">
+                            {new Date(win.date).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                          <button
+                            onClick={() => startEditing(win)}
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+                            title="Edit win"
+                          >
+                            <span className="material-symbols-outlined text-base">edit</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
