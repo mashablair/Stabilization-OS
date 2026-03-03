@@ -915,20 +915,22 @@ export default function TaskDetailPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-                Money Impact ($)
-              </label>
-              <div className="bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center px-4 h-12 border border-transparent focus-within:border-primary transition-all">
-                <span className="material-symbols-outlined text-gradient text-sm">payments</span>
-                <input
-                  className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none pl-2.5"
-                  type="number"
-                  value={task.moneyImpact ?? ""}
-                  onChange={(e) => update({ moneyImpact: Number(e.target.value) || undefined })}
-                />
+            {cat?.kind === "MONEY" && (
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                  Money Impact ($)
+                </label>
+                <div className="bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center px-4 h-12 border border-transparent focus-within:border-primary transition-all">
+                  <span className="material-symbols-outlined text-gradient text-sm">payments</span>
+                  <input
+                    className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none pl-2.5"
+                    type="number"
+                    value={task.moneyImpact ?? ""}
+                    onChange={(e) => update({ moneyImpact: Number(e.target.value) || undefined })}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
