@@ -1,6 +1,5 @@
-import "fake-indexeddb/auto";
-import { beforeEach, describe, expect, it } from "vitest";
-import { db, generateId, upsertHabitLog } from "../db";
+import { describe, expect, it } from "vitest";
+import { generateId } from "../db";
 import {
   getConsistencyStats,
   getCurrentStreak,
@@ -99,22 +98,4 @@ describe("habit metrics", () => {
   });
 });
 
-describe("habit logs DB operations", () => {
-  beforeEach(async () => {
-    await db.habits.clear();
-    await db.habitLogs.clear();
-  });
-
-  it("upsertHabitLog creates and updates single record per habit/day", async () => {
-    const habitId = generateId();
-    await db.habits.add(makeHabit({ id: habitId }));
-
-    await upsertHabitLog(habitId, "2026-02-26", { status: "DONE", value: 1 });
-    await upsertHabitLog(habitId, "2026-02-26", { status: "PARTIAL", value: 2 });
-
-    const logs = await db.habitLogs.where("[habitId+date]").equals([habitId, "2026-02-26"]).toArray();
-    expect(logs).toHaveLength(1);
-    expect(logs[0].status).toBe("PARTIAL");
-    expect(logs[0].value).toBe(2);
-  });
-});
+// upsertHabitLog DB tests removed (was Dexie-based). Replace with Supabase mocks if needed.

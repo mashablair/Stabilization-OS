@@ -7,6 +7,7 @@ import {
 } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
+import { queryClient } from "./queryClient";
 
 interface AuthContextType {
   user: User | null;
@@ -56,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    queryClient.clear();
   };
 
   const resetPassword = async (email: string) => {

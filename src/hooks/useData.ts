@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
+import { useAuth } from "../lib/AuthContext";
 import type {
   Category,
   Task,
@@ -164,10 +165,13 @@ export {
 };
 
 // ---- Query hooks ----
+// All query keys include userId to prevent cache leak between logins
 
 export function useCategories() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["categories"],
+    queryKey: ["categories", user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase.from("categories").select("*");
       if (error) throw error;
@@ -177,9 +181,10 @@ export function useCategories() {
 }
 
 export function useCategory(id: string | undefined) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["categories", id],
-    enabled: !!id,
+    queryKey: ["categories", user?.id, id],
+    enabled: !!user?.id && !!id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
@@ -193,8 +198,10 @@ export function useCategory(id: string | undefined) {
 }
 
 export function useTasks() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["tasks"],
+    queryKey: ["tasks", user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase.from("tasks").select("*");
       if (error) throw error;
@@ -204,9 +211,10 @@ export function useTasks() {
 }
 
 export function useTask(id: string | undefined) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["tasks", id],
-    enabled: !!id,
+    queryKey: ["tasks", user?.id, id],
+    enabled: !!user?.id && !!id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tasks")
@@ -220,9 +228,10 @@ export function useTask(id: string | undefined) {
 }
 
 export function useTasksByCategory(categoryId: string | undefined) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["tasks", "category", categoryId],
-    enabled: !!categoryId,
+    queryKey: ["tasks", user?.id, "category", categoryId],
+    enabled: !!user?.id && !!categoryId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tasks")
@@ -235,8 +244,10 @@ export function useTasksByCategory(categoryId: string | undefined) {
 }
 
 export function useTimeEntries() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["timeEntries"],
+    queryKey: ["timeEntries", user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase.from("time_entries").select("*");
       if (error) throw error;
@@ -246,9 +257,10 @@ export function useTimeEntries() {
 }
 
 export function useTimeEntriesForTask(taskId: string | undefined) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["timeEntries", "task", taskId],
-    enabled: !!taskId,
+    queryKey: ["timeEntries", user?.id, "task", taskId],
+    enabled: !!user?.id && !!taskId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("time_entries")
@@ -261,8 +273,10 @@ export function useTimeEntriesForTask(taskId: string | undefined) {
 }
 
 export function useWeeklyReviews() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["weeklyReviews"],
+    queryKey: ["weeklyReviews", user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase.from("weekly_reviews").select("*");
       if (error) throw error;
@@ -272,8 +286,10 @@ export function useWeeklyReviews() {
 }
 
 export function useTimerState() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["timerState"],
+    queryKey: ["timerState", user?.id],
+    enabled: !!user?.id,
     refetchInterval: 1000,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -288,8 +304,10 @@ export function useTimerState() {
 }
 
 export function useAppSettings() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["appSettings"],
+    queryKey: ["appSettings", user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("app_settings")
@@ -303,8 +321,10 @@ export function useAppSettings() {
 }
 
 export function useDailyCapacity(date: string, domain: string) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["dailyCapacity", date, domain],
+    queryKey: ["dailyCapacity", user?.id, date, domain],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("daily_capacity")
@@ -319,8 +339,10 @@ export function useDailyCapacity(date: string, domain: string) {
 }
 
 export function useWins() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["wins"],
+    queryKey: ["wins", user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase.from("wins").select("*");
       if (error) throw error;
@@ -330,8 +352,10 @@ export function useWins() {
 }
 
 export function useWinsByDate(date: string) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["wins", "date", date],
+    queryKey: ["wins", user?.id, "date", date],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("wins")
@@ -345,8 +369,10 @@ export function useWinsByDate(date: string) {
 }
 
 export function useHabits() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["habits"],
+    queryKey: ["habits", user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase.from("habits").select("*");
       if (error) throw error;
@@ -356,8 +382,10 @@ export function useHabits() {
 }
 
 export function useHabitLogs() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["habitLogs"],
+    queryKey: ["habitLogs", user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data, error } = await supabase.from("habit_logs").select("*");
       if (error) throw error;
