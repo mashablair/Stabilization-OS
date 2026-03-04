@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useAppSettings } from "../hooks/useData";
 import { updateAppSettings, resetAllData, type Category, type Task, type TimeEntry, type WeeklyReview, type DailyCapacity, type AppSettings } from "../db";
 import { supabase } from "../lib/supabase";
-import { rowToCategory, rowToTask, rowToTimeEntry, rowToWeeklyReview, rowToDailyCapacity, rowToHabit, rowToHabitLog, rowToAppSettings } from "../hooks/useData";
+import { rowToCategory, rowToTask, rowToTimeEntry, rowToWeeklyReview, rowToDailyCapacity, rowToWin, rowToHabit, rowToHabitLog, rowToAppSettings } from "../hooks/useData";
 import type { Habit, HabitLog } from "../habits";
+import type { Win } from "../db";
 
 interface ShareBundle {
   meta: { version: string; exportedAt: string; timezone: string };
@@ -12,6 +13,7 @@ interface ShareBundle {
   timeEntries: TimeEntry[];
   weeklyReviews?: WeeklyReview[];
   dailyCapacity?: DailyCapacity[];
+  wins?: Win[];
   habits?: Habit[];
   habitLogs?: HabitLog[];
   appSettings?: AppSettings;
@@ -31,12 +33,13 @@ export default function SettingsPage() {
   };
 
   const exportBundle = async () => {
-    const [catRes, taskRes, teRes, wrRes, dcRes, habRes, hlRes, asRes] = await Promise.all([
+    const [catRes, taskRes, teRes, wrRes, dcRes, winsRes, habRes, hlRes, asRes] = await Promise.all([
       supabase.from("categories").select("*"),
       supabase.from("tasks").select("*"),
       supabase.from("time_entries").select("*"),
       supabase.from("weekly_reviews").select("*"),
       supabase.from("daily_capacity").select("*"),
+      supabase.from("wins").select("*"),
       supabase.from("habits").select("*"),
       supabase.from("habit_logs").select("*"),
       supabase.from("app_settings").select("*").eq("id", "default").maybeSingle(),
@@ -49,6 +52,7 @@ export default function SettingsPage() {
       timeEntries: (teRes.data ?? []).map(rowToTimeEntry),
       weeklyReviews: (wrRes.data ?? []).map(rowToWeeklyReview),
       dailyCapacity: (dcRes.data ?? []).map(rowToDailyCapacity),
+      wins: (winsRes.data ?? []).map(rowToWin),
       habits: (habRes.data ?? []).map(rowToHabit),
       habitLogs: (hlRes.data ?? []).map(rowToHabitLog),
       appSettings: asRes.data ? rowToAppSettings(asRes.data) : undefined,
@@ -93,8 +97,11 @@ export default function SettingsPage() {
       if (bundle.dailyCapacity) for (const dc of bundle.dailyCapacity) {
         await supabase.from("daily_capacity").insert({ id: dc.id, user_id: uid, date: dc.date, domain: dc.domain, minutes: dc.minutes });
       }
+      if (bundle.wins) for (const w of bundle.wins) {
+        await supabase.from("wins").insert({ id: w.id, user_id: uid, text: w.text, date: w.date, tags: w.tags, created_at: w.createdAt });
+      }
       if (bundle.habits) for (const h of bundle.habits) {
-        await supabase.from("habits").insert({ id: h.id, user_id: uid, name: h.name, type: h.type, schedule_type: h.scheduleType, weekdays: h.weekdays, every_n_days: h.everyNDays, times_per_week: h.timesPerWeek, goal_target: h.goalTarget, unit: h.unit, start_date: h.startDate, time_of_day: h.timeOfDay, show_in_today: h.showInToday, allow_partial: h.allowPartial, allow_skip: h.allowSkip, color: h.color, icon: h.icon, sort_order: h.sortOrder, created_at: h.createdAt, updated_at: h.updatedAt });
+        await supabase.from("habits").insert({ id: h.id, user_id: uid, name: h.name, type: h.type, schedule_type: h.scheduleType, weekdays: h.weekdays, every_n_days: h.everyNDays, times_per_week: h.timesPerWeek, goal_target: h.goalTarget, unit: h.unit, start_date: h.startDate, time_of_day: h.timeOfDay, show_in_today: h.showInToday, allow_partial: h.allowPartial, allow_skip: h.allowSkip, color: h.color, icon: h.icon, archived_at: h.archivedAt ?? null, sort_order: h.sortOrder, created_at: h.createdAt, updated_at: h.updatedAt });
       }
       if (bundle.habitLogs) for (const hl of bundle.habitLogs) {
         await supabase.from("habit_logs").insert({ id: hl.id, user_id: uid, habit_id: hl.habitId, date: hl.date, status: hl.status, value: hl.value, note: hl.note, created_at: hl.createdAt, updated_at: hl.updatedAt });
@@ -103,7 +110,7 @@ export default function SettingsPage() {
         await supabase.from("app_settings").upsert({ id: "default", user_id: uid, role: bundle.appSettings.role, available_minutes: bundle.appSettings.availableMinutes, builder_available_minutes: bundle.appSettings.builderAvailableMinutes, dark_mode: bundle.appSettings.darkMode, hidden_category_ids: bundle.appSettings.hiddenCategoryIds });
       }
 
-      setImportStatus(`Imported ${bundle.categories.length} categories, ${bundle.tasks.length} tasks, ${bundle.timeEntries.length} time entries, ${bundle.habits?.length ?? 0} habits, and ${bundle.habitLogs?.length ?? 0} habit logs.`);
+      setImportStatus(`Imported ${bundle.categories.length} categories, ${bundle.tasks.length} tasks, ${bundle.timeEntries.length} time entries, ${bundle.wins?.length ?? 0} wins, ${bundle.habits?.length ?? 0} habits, and ${bundle.habitLogs?.length ?? 0} habit logs.`);
       window.location.reload();
     } catch (err) {
       setImportStatus(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);

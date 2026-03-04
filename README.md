@@ -22,7 +22,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 - **Wins** — A dedicated page to log and browse accomplishments beyond your tracked tasks. Tag wins with life, biz, vitality, or community. Browse by week, month, quarter, or year. Quick-add from the Today page footer. Revisit during quarterly reviews or when you need a boost.
 - **Habits** — Dedicated habits tracker with a fast **Today** strip, one-tap logging (Done / optional Partial / Skip), and compact history views for **Week**, **Month**, and **3 Months**. **Time of day** groups habits into Morning / Anytime / Evening (default Anytime); Today shows collapsible sections (Morning expanded by default) for faster routine logging. History heatmap includes a filter: All / Morning / Anytime / Evening. Day Editor with prev/next navigation for fast backfills, consistency-first stats, streak as secondary, schedule types (daily, weekdays, every N days, X times/week), plus color/icon customization, reordering, and archiving.
 - **Weekly Review** — Guided wizard that starts with a **Wins** step highlighting completed tasks, time invested, money recovered, and **other wins** you logged this week, followed by estimate mismatches, friction reflection, category focus, and smallest next step
-- **Settings** — Configure default daily capacity for Life and Builder, export/import JSON share bundles (includes categories, tasks, habits, habit logs, app settings, time entries), CSV exports (tasks + time entries), dark mode toggle, data reset. Accessible via the gear icon in the header.
+- **Settings** — Configure default daily capacity for Life and Builder, export/import JSON share bundles (includes categories, tasks, wins, habits, habit logs, app settings, time entries, weekly reviews, daily capacity), CSV exports (tasks + time entries), dark mode toggle, data reset. Accessible via the gear icon in the header.
 
 ## Data Storage
 
@@ -35,8 +35,8 @@ Habit tracking uses two tables:
 ## Export / Import
 
 1. Go to **Settings**
-2. Click **Export .json Bundle** to download all your data (including habits + habit logs)
-3. To restore, click **Choose .json file** under Import — this overwrites local data
+2. Click **Export .json Bundle** to download all your data (including wins, habits, habit logs, and all other data)
+3. To restore, click **Choose .json file** under Import — this overwrites all data
 4. CSV exports are also available for `tasks_summary.csv` and `time_entries.csv`
 
 ## Seed Data
