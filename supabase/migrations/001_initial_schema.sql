@@ -68,8 +68,9 @@ create table timer_state (
 );
 
 create table app_settings (
-  id text primary key,
+  id text not null,
   user_id uuid not null references auth.users(id) on delete cascade,
+  primary key (user_id, id),
   role text not null default 'Life',
   available_minutes numeric not null default 120,
   builder_available_minutes numeric not null default 120,
