@@ -16,6 +16,7 @@ import {
   deleteTimeEntry,
   deleteTimeEntriesForTask,
   deleteTask as deleteTaskFn,
+  type Task,
   type Subtask,
 } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
@@ -35,14 +36,53 @@ const PRIORITY_COLORS: Record<number, string> = {
   4: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
 };
 
+type TaskDraftField =
+  | "contextCard"
+  | "frictionNote"
+  | "notes"
+  | "nextActionAt"
+  | "pendingReason"
+  | "estimateMinutes"
+  | "moneyImpact"
+  | "subtasks";
+
+function parseOptionalNumber(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+  return parsed;
+}
+
+function buildSubtaskEstimateDrafts(subtasks: Subtask[]): Record<string, string> {
+  return Object.fromEntries(
+    subtasks.map((subtask) => [subtask.id, subtask.estimateMinutes?.toString() ?? ""])
+  );
+}
+
+function mergeTaskDraft(remoteTask: Task, draftTask: Task, dirtyFields: Set<TaskDraftField>): Task {
+  return {
+    ...remoteTask,
+    contextCard: dirtyFields.has("contextCard") ? draftTask.contextCard : remoteTask.contextCard,
+    frictionNote: dirtyFields.has("frictionNote") ? draftTask.frictionNote : remoteTask.frictionNote,
+    notes: dirtyFields.has("notes") ? draftTask.notes : remoteTask.notes,
+    nextActionAt: dirtyFields.has("nextActionAt") ? draftTask.nextActionAt : remoteTask.nextActionAt,
+    pendingReason: dirtyFields.has("pendingReason") ? draftTask.pendingReason : remoteTask.pendingReason,
+    estimateMinutes: dirtyFields.has("estimateMinutes") ? draftTask.estimateMinutes : remoteTask.estimateMinutes,
+    moneyImpact: dirtyFields.has("moneyImpact") ? draftTask.moneyImpact : remoteTask.moneyImpact,
+    subtasks: dirtyFields.has("subtasks") ? draftTask.subtasks : remoteTask.subtasks,
+  };
+}
+
 export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: task } = useTask(id);
+  const { data: remoteTask } = useTask(id);
   const { data: allCategories = [] } = useCategories();
-  const categories = getCategoriesByDomain(allCategories, task?.domain ?? "LIFE_ADMIN");
   const { data: timeEntries = [] } = useTimeEntriesForTask(id);
   const timer = useTimer();
+  const [draftTask, setDraftTask] = useState<Task | null>(null);
+  const [dirtyFields, setDirtyFields] = useState<Set<TaskDraftField>>(new Set());
   const [newSubtask, setNewSubtask] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitle, setEditingTitle] = useState("");
@@ -50,6 +90,9 @@ export default function TaskDetailPage() {
   const [editingSubtaskTitle, setEditingSubtaskTitle] = useState("");
   const [addTimeInput, setAddTimeInput] = useState("");
   const [selectedSubtaskId, setSelectedSubtaskId] = useState<string | null>(null);
+  const [estimateMinutesDraft, setEstimateMinutesDraft] = useState("");
+  const [moneyImpactDraft, setMoneyImpactDraft] = useState("");
+  const [subtaskEstimateDrafts, setSubtaskEstimateDrafts] = useState<Record<string, string>>({});
   const [projectModeNotice, setProjectModeNotice] = useState<
     { variant: "captured" | "switched"; estimate: string; actual: string } | null
   >(null);
@@ -61,9 +104,40 @@ export default function TaskDetailPage() {
     setEditingSubtaskId(null);
     setEditingSubtaskTitle("");
     setSelectedSubtaskId(null);
+    setDraftTask(null);
+    setDirtyFields(new Set());
+    setEstimateMinutesDraft("");
+    setMoneyImpactDraft("");
+    setSubtaskEstimateDrafts({});
     setProjectModeNotice(null);
     setModeSwitchConfirm(null);
   }, [id]);
+
+  useEffect(() => {
+    if (!remoteTask) return;
+    setDraftTask((prev) => {
+      if (!prev || prev.id !== remoteTask.id) return remoteTask;
+      return mergeTaskDraft(remoteTask, prev, dirtyFields);
+    });
+  }, [remoteTask, dirtyFields]);
+
+  useEffect(() => {
+    if (!draftTask || dirtyFields.has("estimateMinutes")) return;
+    setEstimateMinutesDraft(draftTask.estimateMinutes?.toString() ?? "");
+  }, [draftTask, dirtyFields]);
+
+  useEffect(() => {
+    if (!draftTask || dirtyFields.has("moneyImpact")) return;
+    setMoneyImpactDraft(draftTask.moneyImpact?.toString() ?? "");
+  }, [draftTask, dirtyFields]);
+
+  useEffect(() => {
+    if (!draftTask || dirtyFields.has("subtasks")) return;
+    setSubtaskEstimateDrafts(buildSubtaskEstimateDrafts(draftTask.subtasks));
+  }, [draftTask, dirtyFields]);
+
+  const task = draftTask ?? remoteTask;
+  const categories = getCategoriesByDomain(allCategories, task?.domain ?? "LIFE_ADMIN");
 
   useEffect(() => {
     if (!task || !isProjectMode(task)) return;
@@ -103,15 +177,84 @@ export default function TaskDetailPage() {
   const isFocusedTimer = isActive && (!isProjectTask || timer.activeSubtaskId === focusSubtask?.id);
   const isRunning = isFocusedTimer && timer.isRunning;
   const isPaused = isFocusedTimer && timer.isPaused;
+  const hasUnsavedChanges = dirtyFields.size > 0;
 
-  const update = (fields: Partial<typeof task>) =>
-    updateTask(task.id, { ...fields, updatedAt: nowISO() });
+  const markDirty = (...fields: TaskDraftField[]) => {
+    if (fields.length === 0) return;
+    setDirtyFields((prev) => {
+      const next = new Set(prev);
+      for (const field of fields) next.add(field);
+      return next;
+    });
+  };
+
+  const clearDirty = (...fields: TaskDraftField[]) => {
+    if (fields.length === 0) return;
+    setDirtyFields((prev) => {
+      const next = new Set(prev);
+      for (const field of fields) next.delete(field);
+      return next;
+    });
+  };
+
+  const setLocalTaskFields = (fields: Partial<Task>) => {
+    setDraftTask((prev) => (prev ? { ...prev, ...fields } : prev));
+  };
+
+  const updateImmediate = async (fields: Partial<Task>) => {
+    setLocalTaskFields(fields);
+    await updateTask(task.id, { ...fields, updatedAt: nowISO() });
+  };
 
   const sumSubtaskEstimate = (subtasks: Subtask[]) =>
     subtasks.reduce((sum, subtask) => sum + (subtask.estimateMinutes ?? 0), 0);
 
   const sumSubtaskActual = (subtasks: Subtask[]) =>
     subtasks.reduce((sum, subtask) => sum + (subtask.actualSecondsTotal ?? 0), 0);
+
+  const buildTaskUpdateForFields = (fields: TaskDraftField[]): Partial<Task> => {
+    const updates: Partial<Task> = {};
+    for (const field of fields) {
+      if (field === "contextCard") updates.contextCard = task.contextCard;
+      if (field === "frictionNote") updates.frictionNote = task.frictionNote;
+      if (field === "notes") updates.notes = task.notes;
+      if (field === "nextActionAt") updates.nextActionAt = task.nextActionAt;
+      if (field === "pendingReason") updates.pendingReason = task.pendingReason;
+      if (field === "estimateMinutes") updates.estimateMinutes = parseOptionalNumber(estimateMinutesDraft);
+      if (field === "moneyImpact") updates.moneyImpact = parseOptionalNumber(moneyImpactDraft);
+      if (field === "subtasks") {
+        updates.subtasks = task.subtasks;
+        if (isProjectTask) {
+          updates.estimateMinutes = sumSubtaskEstimate(task.subtasks);
+        }
+      }
+    }
+    return updates;
+  };
+
+  const commitDraftFields = async (...fields: TaskDraftField[]) => {
+    const pendingFields = fields.filter((field) => dirtyFields.has(field));
+    if (pendingFields.length === 0 || !remoteTask) return;
+    const updates = buildTaskUpdateForFields(pendingFields);
+    const hasChanges = pendingFields.some((field) => {
+      if (field === "contextCard") return JSON.stringify(task.contextCard) !== JSON.stringify(remoteTask.contextCard);
+      if (field === "frictionNote") return task.frictionNote !== remoteTask.frictionNote;
+      if (field === "notes") return task.notes !== remoteTask.notes;
+      if (field === "nextActionAt") return task.nextActionAt !== remoteTask.nextActionAt;
+      if (field === "pendingReason") return task.pendingReason !== remoteTask.pendingReason;
+      if (field === "estimateMinutes") return updates.estimateMinutes !== remoteTask.estimateMinutes;
+      if (field === "moneyImpact") return updates.moneyImpact !== remoteTask.moneyImpact;
+      if (field === "subtasks") return JSON.stringify(task.subtasks) !== JSON.stringify(remoteTask.subtasks);
+      return false;
+    });
+    clearDirty(...pendingFields);
+    if (!hasChanges) {
+      setLocalTaskFields(updates);
+      return;
+    }
+    setLocalTaskFields(updates);
+    await updateTask(task.id, { ...updates, updatedAt: nowISO() });
+  };
 
   const addSubtask = async () => {
     if (!newSubtask.trim()) return;
@@ -129,7 +272,8 @@ export default function TaskDetailPage() {
       updates.estimateMinutes = sumSubtaskEstimate(updated);
       updates.actualSecondsTotal = sumSubtaskActual(updated);
     }
-    await update(updates);
+    setSubtaskEstimateDrafts(buildSubtaskEstimateDrafts(updated));
+    await updateImmediate(updates);
     setSelectedSubtaskId(updated[updated.length - 1]?.id ?? null);
     setNewSubtask("");
   };
@@ -138,8 +282,9 @@ export default function TaskDetailPage() {
     const updated = task.subtasks.map((s) =>
       s.id === subId ? { ...s, done: !s.done } : s
     );
-    await update({ subtasks: updated });
+    await updateImmediate({ subtasks: updated });
     if (updated.length > 0 && updated.every((s) => s.done) && task.status !== "DONE") {
+      setLocalTaskFields({ status: "DONE", completedAt: nowISO() });
       await markTaskDone(task.id);
     }
   };
@@ -154,7 +299,8 @@ export default function TaskDetailPage() {
       updates.estimateMinutes = sumSubtaskEstimate(updated);
       updates.actualSecondsTotal = sumSubtaskActual(updated);
     }
-    await update(updates);
+    setSubtaskEstimateDrafts(buildSubtaskEstimateDrafts(updated));
+    await updateImmediate(updates);
     if (selectedSubtaskId === subId) {
       setSelectedSubtaskId(updated[0]?.id ?? null);
     }
@@ -167,20 +313,24 @@ export default function TaskDetailPage() {
     const updated = task.subtasks.map((s) =>
       s.id === subId ? { ...s, title: trimmed } : s
     );
-    await update({ subtasks: updated });
+    await updateImmediate({ subtasks: updated });
   };
 
-  const updateSubtaskEstimate = async (subId: string, rawValue: string) => {
-    const parsed = Number(rawValue);
-    const estimateMinutes =
-      Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : undefined;
+  const updateSubtaskEstimateDraft = (subId: string, rawValue: string) => {
+    const estimateMinutes = parseOptionalNumber(rawValue);
     const updated = task.subtasks.map((subtask) =>
       subtask.id === subId ? { ...subtask, estimateMinutes } : subtask
     );
-    await update({
+    setSubtaskEstimateDrafts((prev) => ({ ...prev, [subId]: rawValue }));
+    setLocalTaskFields({
       subtasks: updated,
       estimateMinutes: sumSubtaskEstimate(updated),
     });
+    markDirty("subtasks");
+  };
+
+  const commitSubtaskEstimates = async () => {
+    await commitDraftFields("subtasks");
   };
 
   const switchToProjectMode = async () => {
@@ -199,7 +349,7 @@ export default function TaskDetailPage() {
       actualSecondsTotal: subtask.actualSecondsTotal ?? 0,
       estimateMinutes: subtask.estimateMinutes ?? undefined,
     }));
-    await update({
+    await updateImmediate({
       timeTrackingMode: "PROJECT",
       subtasks: updatedSubtasks,
       estimateMinutes: sumSubtaskEstimate(updatedSubtasks),
@@ -233,7 +383,7 @@ export default function TaskDetailPage() {
       totalEstimate = freshTask.estimateMinutes!;
     }
     await deleteTimeEntriesForTask(task.id);
-    await update({
+    await updateImmediate({
       timeTrackingMode: "TASK",
       estimateMinutes: totalEstimate || undefined,
       actualSecondsTotal: totalActual,
@@ -363,8 +513,10 @@ export default function TaskDetailPage() {
               <button
                 onClick={async () => {
                   if (task.status === "DONE") {
+                    setLocalTaskFields({ status: "BACKLOG", completedAt: undefined });
                     await unmarkTaskDone(task.id);
                   } else {
+                    setLocalTaskFields({ status: "DONE", completedAt: nowISO() });
                     await markTaskDone(task.id);
                   }
                 }}
@@ -386,7 +538,8 @@ export default function TaskDetailPage() {
                   onBlur={async () => {
                     const trimmed = editingTitle.trim();
                     if (trimmed && trimmed !== task.title) {
-                      await update({ title: trimmed });
+                      setLocalTaskFields({ title: trimmed });
+                      await updateTask(task.id, { title: trimmed, updatedAt: nowISO() });
                     }
                     setIsEditingTitle(false);
                     setEditingTitle("");
@@ -419,6 +572,11 @@ export default function TaskDetailPage() {
               <span className={`px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${PRIORITY_COLORS[task.priority]}`}>
                 {PRIORITY_LABELS[task.priority]} Priority
               </span>
+              {hasUnsavedChanges && (
+                <span className="px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                  Unsaved edits
+                </span>
+              )}
               {task.status === "PENDING" && (
                 <span className="px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1">
                   <span className="material-symbols-outlined text-xs">hourglass_top</span>
@@ -438,7 +596,7 @@ export default function TaskDetailPage() {
               )}
               <select
                 value={task.status}
-                onChange={(e) => update({ status: e.target.value as typeof task.status })}
+                onChange={(e) => updateImmediate({ status: e.target.value as typeof task.status })}
                 className="text-xs font-bold bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-2 py-1"
               >
                 {STATUS_OPTIONS.map((s) => (
@@ -459,9 +617,11 @@ export default function TaskDetailPage() {
                 className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm text-slate-600 dark:text-slate-400 resize-none min-h-[80px] focus:outline-none"
                 placeholder="Why does this matter?"
                 value={task.contextCard.why}
-                onChange={(e) =>
-                  update({ contextCard: { ...task.contextCard, why: e.target.value } })
-                }
+                onChange={(e) => {
+                  setLocalTaskFields({ contextCard: { ...task.contextCard, why: e.target.value } });
+                  markDirty("contextCard");
+                }}
+                onBlur={() => commitDraftFields("contextCard")}
               />
             </div>
             <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-md border-2 border-primary/30">
@@ -473,9 +633,11 @@ export default function TaskDetailPage() {
                 className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm font-semibold resize-none min-h-[80px] focus:outline-none"
                 placeholder="What's making this hard?"
                 value={task.frictionNote ?? ""}
-                onChange={(e) =>
-                  update({ frictionNote: e.target.value })
-                }
+                onChange={(e) => {
+                  setLocalTaskFields({ frictionNote: e.target.value });
+                  markDirty("frictionNote");
+                }}
+                onBlur={() => commitDraftFields("frictionNote")}
               />
             </div>
             <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -487,9 +649,11 @@ export default function TaskDetailPage() {
                 className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm text-slate-600 dark:text-slate-400 resize-none min-h-[80px] focus:outline-none"
                 placeholder="How can you look at this differently?"
                 value={task.contextCard.reframe}
-                onChange={(e) =>
-                  update({ contextCard: { ...task.contextCard, reframe: e.target.value } })
-                }
+                onChange={(e) => {
+                  setLocalTaskFields({ contextCard: { ...task.contextCard, reframe: e.target.value } });
+                  markDirty("contextCard");
+                }}
+                onBlur={() => commitDraftFields("contextCard")}
               />
             </div>
           </div>
@@ -561,8 +725,9 @@ export default function TaskDetailPage() {
                         <input
                           type="number"
                           min={0}
-                          value={sub.estimateMinutes ?? ""}
-                          onChange={(e) => updateSubtaskEstimate(sub.id, e.target.value)}
+                          value={subtaskEstimateDrafts[sub.id] ?? ""}
+                          onChange={(e) => updateSubtaskEstimateDraft(sub.id, e.target.value)}
+                          onBlur={commitSubtaskEstimates}
                           className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-2 py-1.5 text-xs font-semibold text-right focus:ring-2 focus:ring-primary"
                           placeholder="min"
                           title="Subtask estimate in minutes"
@@ -635,7 +800,11 @@ export default function TaskDetailPage() {
                 className="w-full bg-transparent border-none focus:ring-0 p-0 text-slate-700 dark:text-slate-300 leading-relaxed min-h-[120px] focus:outline-none"
                 placeholder="Add deeper details, links, or thoughts here..."
                 value={task.notes ?? ""}
-                onChange={(e) => update({ notes: e.target.value })}
+                onChange={(e) => {
+                  setLocalTaskFields({ notes: e.target.value });
+                  markDirty("notes");
+                }}
+                onBlur={() => commitDraftFields("notes")}
               />
             </div>
           </div>
@@ -661,7 +830,11 @@ export default function TaskDetailPage() {
                   <input
                     type="date"
                     value={task.nextActionAt ? task.nextActionAt.slice(0, 10) : ""}
-                    onChange={(e) => update({ nextActionAt: e.target.value || undefined })}
+                    onChange={(e) => {
+                      setLocalTaskFields({ nextActionAt: e.target.value || undefined });
+                      markDirty("nextActionAt");
+                    }}
+                    onBlur={() => commitDraftFields("nextActionAt")}
                     className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 h-12 text-sm font-bold focus:ring-2 focus:ring-amber-400"
                     autoFocus={!task.nextActionAt}
                   />
@@ -680,13 +853,20 @@ export default function TaskDetailPage() {
                     className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 h-12 text-sm focus:ring-2 focus:ring-amber-400"
                     placeholder="e.g. Waiting for response..."
                     value={task.pendingReason ?? ""}
-                    onChange={(e) => update({ pendingReason: e.target.value || undefined })}
+                    onChange={(e) => {
+                      setLocalTaskFields({ pendingReason: e.target.value || undefined });
+                      markDirty("pendingReason");
+                    }}
+                    onBlur={() => commitDraftFields("pendingReason")}
                   />
                 </div>
               </div>
 
               <button
-                onClick={() => update({ status: "BACKLOG", nextActionAt: undefined, pendingReason: undefined })}
+                onClick={() => {
+                  clearDirty("nextActionAt", "pendingReason");
+                  updateImmediate({ status: "BACKLOG", nextActionAt: undefined, pendingReason: undefined });
+                }}
                 className="w-full mt-2 py-3 rounded-xl border-2 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 font-bold text-sm hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all flex items-center justify-center gap-2"
               >
                 <span className="material-symbols-outlined text-sm">play_arrow</span>
@@ -881,8 +1061,13 @@ export default function TaskDetailPage() {
                 <input
                   className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none pl-2.5"
                   type="number"
-                  value={isProjectTask ? totalEstimateMinutes : task.estimateMinutes ?? ""}
-                  onChange={(e) => update({ estimateMinutes: Number(e.target.value) || undefined })}
+                  value={isProjectTask ? totalEstimateMinutes : estimateMinutesDraft}
+                  onChange={(e) => {
+                    setEstimateMinutesDraft(e.target.value);
+                    setLocalTaskFields({ estimateMinutes: parseOptionalNumber(e.target.value) });
+                    markDirty("estimateMinutes");
+                  }}
+                  onBlur={() => commitDraftFields("estimateMinutes")}
                   disabled={isProjectTask}
                   min={0}
                 />
@@ -896,7 +1081,7 @@ export default function TaskDetailPage() {
               </label>
               <select
                 value={task.priority}
-                onChange={(e) => update({ priority: Number(e.target.value) as 1 | 2 | 3 | 4 })}
+                onChange={(e) => updateImmediate({ priority: Number(e.target.value) as 1 | 2 | 3 | 4 })}
                 className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 h-12 text-sm font-bold"
               >
                 {[1, 2, 3, 4].map((p) => (
@@ -912,7 +1097,7 @@ export default function TaskDetailPage() {
               <input
                 type="date"
                 value={task.dueDate ? task.dueDate.slice(0, 10) : ""}
-                onChange={(e) => update({ dueDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
+                onChange={(e) => updateImmediate({ dueDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
                 className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 h-12 text-sm font-bold"
               />
             </div>
@@ -927,8 +1112,13 @@ export default function TaskDetailPage() {
                   <input
                     className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none pl-2.5"
                     type="number"
-                    value={task.moneyImpact ?? ""}
-                    onChange={(e) => update({ moneyImpact: Number(e.target.value) || undefined })}
+                    value={moneyImpactDraft}
+                    onChange={(e) => {
+                      setMoneyImpactDraft(e.target.value);
+                      setLocalTaskFields({ moneyImpact: parseOptionalNumber(e.target.value) });
+                      markDirty("moneyImpact");
+                    }}
+                    onBlur={() => commitDraftFields("moneyImpact")}
                   />
                 </div>
               </div>
@@ -947,7 +1137,7 @@ export default function TaskDetailPage() {
                     key={d}
                     type="button"
                     onClick={() =>
-                      update({
+                      updateImmediate({
                         domain: d,
                         ...(defaultCatId && { categoryId: defaultCatId }),
                       })
@@ -970,7 +1160,7 @@ export default function TaskDetailPage() {
               </label>
               <select
                 value={task.categoryId}
-                onChange={(e) => update({ categoryId: e.target.value })}
+                onChange={(e) => updateImmediate({ categoryId: e.target.value })}
                 className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 h-12 text-sm font-bold"
               >
                 {categories.map((c) => (

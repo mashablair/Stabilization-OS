@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppSettings } from "../hooks/useData";
 import { updateAppSettings, resetAllData, type Category, type Task, type TimeEntry, type WeeklyReview, type DailyCapacity, type AppSettings } from "../db";
 import { supabase } from "../lib/supabase";
@@ -23,13 +23,39 @@ export default function SettingsPage() {
   const { data: settings } = useAppSettings();
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState("");
+  const [stabilizerDraft, setStabilizerDraft] = useState("");
+  const [builderDraft, setBuilderDraft] = useState("");
+  const [dirtyFields, setDirtyFields] = useState<Set<"availableMinutes" | "builderAvailableMinutes">>(new Set());
 
   const stabilizerDefault = settings?.availableMinutes ?? 120;
   const builderDefault = settings?.builderAvailableMinutes ?? 120;
 
-  const updateSetting = (field: "availableMinutes" | "builderAvailableMinutes", value: number) => {
+  const updateSetting = async (field: "availableMinutes" | "builderAvailableMinutes", value: number) => {
     const v = Math.max(0, value);
-    updateAppSettings({ [field]: v });
+    setDirtyFields((prev) => {
+      const next = new Set(prev);
+      next.delete(field);
+      return next;
+    });
+    await updateAppSettings({ [field]: v });
+  };
+
+  useEffect(() => {
+    if (!dirtyFields.has("availableMinutes")) {
+      setStabilizerDraft(String(stabilizerDefault));
+    }
+  }, [stabilizerDefault, dirtyFields]);
+
+  useEffect(() => {
+    if (!dirtyFields.has("builderAvailableMinutes")) {
+      setBuilderDraft(String(builderDefault));
+    }
+  }, [builderDefault, dirtyFields]);
+
+  const commitSetting = async (field: "availableMinutes" | "builderAvailableMinutes") => {
+    const raw = field === "availableMinutes" ? stabilizerDraft : builderDraft;
+    const parsed = Number(raw);
+    await updateSetting(field, Number.isFinite(parsed) ? parsed : 0);
   };
 
   const exportBundle = async () => {
@@ -162,14 +188,34 @@ export default function SettingsPage() {
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Life</label>
               <div className="flex items-center gap-2">
-                <input type="number" value={stabilizerDefault} onChange={(e) => updateSetting("availableMinutes", Number(e.target.value) || 0)} min={0} className="w-24 bg-slate-100 dark:bg-background-dark border-none rounded-xl px-4 py-3 text-lg font-bold focus:ring-2 focus:ring-primary transition-all text-center" />
+                <input
+                  type="number"
+                  value={stabilizerDraft}
+                  onChange={(e) => {
+                    setStabilizerDraft(e.target.value);
+                    setDirtyFields((prev) => new Set(prev).add("availableMinutes"));
+                  }}
+                  onBlur={() => commitSetting("availableMinutes")}
+                  min={0}
+                  className="w-24 bg-slate-100 dark:bg-background-dark border-none rounded-xl px-4 py-3 text-lg font-bold focus:ring-2 focus:ring-primary transition-all text-center"
+                />
                 <span className="text-sm font-medium text-slate-400">minutes / day</span>
               </div>
             </div>
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Builder (Business)</label>
               <div className="flex items-center gap-2">
-                <input type="number" value={builderDefault} onChange={(e) => updateSetting("builderAvailableMinutes", Number(e.target.value) || 0)} min={0} className="w-24 bg-slate-100 dark:bg-background-dark border-none rounded-xl px-4 py-3 text-lg font-bold focus:ring-2 focus:ring-primary transition-all text-center" />
+                <input
+                  type="number"
+                  value={builderDraft}
+                  onChange={(e) => {
+                    setBuilderDraft(e.target.value);
+                    setDirtyFields((prev) => new Set(prev).add("builderAvailableMinutes"));
+                  }}
+                  onBlur={() => commitSetting("builderAvailableMinutes")}
+                  min={0}
+                  className="w-24 bg-slate-100 dark:bg-background-dark border-none rounded-xl px-4 py-3 text-lg font-bold focus:ring-2 focus:ring-primary transition-all text-center"
+                />
                 <span className="text-sm font-medium text-slate-400">minutes / day</span>
               </div>
             </div>

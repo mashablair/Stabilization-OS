@@ -85,6 +85,10 @@ export default function HabitsPage() {
     ANYTIME: false,
     EVENING: false,
   });
+  const [numericDrafts, setNumericDrafts] = useState<Record<string, string>>({});
+  const [dirtyNumericKeys, setDirtyNumericKeys] = useState<Set<string>>(new Set());
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [dirtyNoteKeys, setDirtyNoteKeys] = useState<Set<string>>(new Set());
 
   const activeHabits = habits.filter((h) => !h.archivedAt);
   const today = todayDateStr();
@@ -99,6 +103,33 @@ export default function HabitsPage() {
   }, [logs]);
 
   const getLog = (habitId: string, date: string) => logsByHabitAndDate.get(`${habitId}|${date}`);
+  const getLogKey = (habitId: string, date: string) => `${habitId}|${date}`;
+
+  useEffect(() => {
+    setNumericDrafts((prev) => {
+      const next = { ...prev };
+      for (const log of logs) {
+        const key = getLogKey(log.habitId, log.date);
+        if (!dirtyNumericKeys.has(key)) {
+          next[key] = log.value?.toString() ?? "0";
+        }
+      }
+      return next;
+    });
+  }, [logs, dirtyNumericKeys]);
+
+  useEffect(() => {
+    setNoteDrafts((prev) => {
+      const next = { ...prev };
+      for (const log of logs) {
+        const key = getLogKey(log.habitId, log.date);
+        if (!dirtyNoteKeys.has(key)) {
+          next[key] = log.note ?? "";
+        }
+      }
+      return next;
+    });
+  }, [logs, dirtyNoteKeys]);
 
   const todayHabits = activeHabits.filter((habit) => habit.showInToday && isHabitScheduledOnDate(habit, today));
   const todayHabitsByTime = useMemo(() => {
@@ -114,32 +145,75 @@ export default function HabitsPage() {
       ? activeHabits
       : activeHabits.filter((habit) => getHabitTimeOfDay(habit) === historyTimeFilter);
 
+  const getNumericDraftValue = (habitId: string, date: string) =>
+    numericDrafts[getLogKey(habitId, date)] ?? (getLog(habitId, date)?.value?.toString() ?? "0");
+
+  const getNoteDraftValue = (habitId: string, date: string) =>
+    noteDrafts[getLogKey(habitId, date)] ?? (getLog(habitId, date)?.note ?? "");
+
+  const parseDraftValue = (habitId: string, date: string) => {
+    const parsed = Number(getNumericDraftValue(habitId, date));
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.max(0, parsed);
+  };
+
   const setStatus = async (habit: Habit, date: string, status: HabitLogStatus) => {
     const existing = getLog(habit.id, date);
-    const keepValue = status === "DONE" || status === "PARTIAL" ? existing?.value : undefined;
+    const keepValue = status === "DONE" || status === "PARTIAL" ? parseDraftValue(habit.id, date) : undefined;
     await upsertHabitLog(habit.id, date, {
       status,
       value: keepValue,
-      note: existing?.note,
+      note: getNoteDraftValue(habit.id, date) || existing?.note,
     });
   };
 
-  const setNumericValue = async (habit: Habit, date: string, nextValue: number) => {
-    const safe = Math.max(0, nextValue);
+  const setNumericDraftValue = (habitId: string, date: string, rawValue: string) => {
+    const key = getLogKey(habitId, date);
+    setNumericDrafts((prev) => ({ ...prev, [key]: rawValue }));
+    setDirtyNumericKeys((prev) => new Set(prev).add(key));
+  };
+
+  const commitNumericValue = async (habit: Habit, date: string, explicitValue?: number) => {
+    const safe = Math.max(0, explicitValue ?? parseDraftValue(habit.id, date));
+    const key = getLogKey(habit.id, date);
     const status: HabitLogStatus = safe > 0 ? "PARTIAL" : "NONE";
     const existing = getLog(habit.id, date);
+    setNumericDrafts((prev) => ({ ...prev, [key]: String(safe) }));
+    setDirtyNumericKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
     await upsertHabitLog(habit.id, date, {
       status: safe >= (habit.goalTarget ?? 0) && (habit.goalTarget ?? 0) > 0 ? "DONE" : status,
       value: safe,
-      note: existing?.note,
+      note: getNoteDraftValue(habit.id, date) || existing?.note,
     });
   };
 
-  const updateDayNote = async (habitId: string, date: string, note: string) => {
+  const stepNumericValue = async (habit: Habit, date: string, delta: number) => {
+    const nextValue = Math.max(0, parseDraftValue(habit.id, date) + delta);
+    await commitNumericValue(habit, date, nextValue);
+  };
+
+  const setNoteDraftValue = (habitId: string, date: string, note: string) => {
+    const key = getLogKey(habitId, date);
+    setNoteDrafts((prev) => ({ ...prev, [key]: note }));
+    setDirtyNoteKeys((prev) => new Set(prev).add(key));
+  };
+
+  const updateDayNote = async (habitId: string, date: string) => {
     const existing = getLog(habitId, date);
+    const key = getLogKey(habitId, date);
+    const note = getNoteDraftValue(habitId, date);
+    setDirtyNoteKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
     await upsertHabitLog(habitId, date, {
       status: existing?.status ?? "NONE",
-      value: existing?.value,
+      value: parseDraftValue(habitId, date),
       note,
     });
   };
@@ -214,7 +288,7 @@ export default function HabitsPage() {
                       ) : (
                         sectionHabits.map((habit) => {
                           const log = getLog(habit.id, today);
-                          const value = log?.value ?? 0;
+                          const value = getNumericDraftValue(habit.id, today);
                           return (
                             <div key={habit.id} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col gap-2">
                               <div className="flex items-center justify-between gap-3">
@@ -265,7 +339,7 @@ export default function HabitsPage() {
                                   <button
                                     type="button"
                                     className="size-7 rounded-lg border border-slate-200 dark:border-slate-700"
-                                    onClick={() => setNumericValue(habit, today, value - 1)}
+                                    onClick={() => stepNumericValue(habit, today, -1)}
                                   >
                                     -
                                   </button>
@@ -273,13 +347,14 @@ export default function HabitsPage() {
                                     type="number"
                                     value={value}
                                     min={0}
-                                    onChange={(e) => setNumericValue(habit, today, Number(e.target.value) || 0)}
+                                    onChange={(e) => setNumericDraftValue(habit.id, today, e.target.value)}
+                                    onBlur={() => commitNumericValue(habit, today)}
                                     className="w-18 text-center rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent px-2 py-1.5 text-sm"
                                   />
                                   <button
                                     type="button"
                                     className="size-7 rounded-lg border border-slate-200 dark:border-slate-700"
-                                    onClick={() => setNumericValue(habit, today, value + 1)}
+                                    onClick={() => stepNumericValue(habit, today, 1)}
                                   >
                                     +
                                   </button>
@@ -474,8 +549,13 @@ export default function HabitsPage() {
         }}
         habits={activeHabits}
         getLog={getLog}
+        getNumericDraftValue={getNumericDraftValue}
+        getNoteDraftValue={getNoteDraftValue}
         setStatus={setStatus}
-        setNumericValue={setNumericValue}
+        setNumericDraftValue={setNumericDraftValue}
+        commitNumericValue={commitNumericValue}
+        stepNumericValue={stepNumericValue}
+        setNoteDraftValue={setNoteDraftValue}
         setNote={updateDayNote}
       />
     </div>
@@ -1212,8 +1292,13 @@ function DayEditorModal({
   onNext,
   habits,
   getLog,
+  getNumericDraftValue,
+  getNoteDraftValue,
   setStatus,
-  setNumericValue,
+  setNumericDraftValue,
+  commitNumericValue,
+  stepNumericValue,
+  setNoteDraftValue,
   setNote,
 }: {
   open: boolean;
@@ -1223,9 +1308,14 @@ function DayEditorModal({
   onNext: () => void;
   habits: Habit[];
   getLog: (habitId: string, date: string) => HabitLog | undefined;
+  getNumericDraftValue: (habitId: string, date: string) => string;
+  getNoteDraftValue: (habitId: string, date: string) => string;
   setStatus: (habit: Habit, date: string, status: HabitLogStatus) => Promise<void>;
-  setNumericValue: (habit: Habit, date: string, value: number) => Promise<void>;
-  setNote: (habitId: string, date: string, note: string) => Promise<void>;
+  setNumericDraftValue: (habitId: string, date: string, value: string) => void;
+  commitNumericValue: (habit: Habit, date: string, explicitValue?: number) => Promise<void>;
+  stepNumericValue: (habit: Habit, date: string, delta: number) => Promise<void>;
+  setNoteDraftValue: (habitId: string, date: string, note: string) => void;
+  setNote: (habitId: string, date: string) => Promise<void>;
 }) {
   const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
   if (!open) return null;
@@ -1252,7 +1342,7 @@ function DayEditorModal({
           <div className="space-y-3">
             {scheduled.map((habit) => {
               const log = getLog(habit.id, date);
-              const value = log?.value ?? 0;
+              const value = getNumericDraftValue(habit.id, date);
               return (
                 <div key={habit.id} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
@@ -1301,17 +1391,18 @@ function DayEditorModal({
 
                   {habit.type !== "CHECK" && (
                     <div className="flex items-center gap-2">
-                      <button type="button" className="size-7 rounded-lg border border-slate-200 dark:border-slate-700" onClick={() => setNumericValue(habit, date, value - 1)}>
+                      <button type="button" className="size-7 rounded-lg border border-slate-200 dark:border-slate-700" onClick={() => stepNumericValue(habit, date, -1)}>
                         -
                       </button>
                       <input
                         type="number"
                         min={0}
                         value={value}
-                        onChange={(e) => setNumericValue(habit, date, Number(e.target.value) || 0)}
+                        onChange={(e) => setNumericDraftValue(habit.id, date, e.target.value)}
+                        onBlur={() => commitNumericValue(habit, date)}
                         className="w-18 text-center rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent px-2 py-1.5 text-sm"
                       />
-                      <button type="button" className="size-7 rounded-lg border border-slate-200 dark:border-slate-700" onClick={() => setNumericValue(habit, date, value + 1)}>
+                      <button type="button" className="size-7 rounded-lg border border-slate-200 dark:border-slate-700" onClick={() => stepNumericValue(habit, date, 1)}>
                         +
                       </button>
                     </div>
@@ -1327,8 +1418,9 @@ function DayEditorModal({
                     </button>
                     {expandedNoteId === habit.id && (
                       <textarea
-                        value={log?.note ?? ""}
-                        onChange={(e) => setNote(habit.id, date, e.target.value)}
+                        value={getNoteDraftValue(habit.id, date)}
+                        onChange={(e) => setNoteDraftValue(habit.id, date, e.target.value)}
+                        onBlur={() => setNote(habit.id, date)}
                         rows={2}
                         className="mt-2 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-3 py-2 text-sm"
                         placeholder="Optional note..."
