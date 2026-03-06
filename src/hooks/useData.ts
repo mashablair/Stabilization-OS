@@ -290,7 +290,8 @@ export function useTimerState() {
   return useQuery({
     queryKey: ["timerState", user?.id],
     enabled: !!user?.id,
-    refetchInterval: 1000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("timer_state")
