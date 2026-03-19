@@ -137,7 +137,8 @@ export default function TaskDetailPage() {
       return;
     }
     if (!currentSelectedExists) {
-      setSelectedSubtaskId(task.subtasks[0]?.id ?? null);
+      const firstIncomplete = task.subtasks.find((s) => !s.done);
+      setSelectedSubtaskId(firstIncomplete?.id ?? task.subtasks[0]?.id ?? null);
     }
   }, [task, selectedSubtaskId, timer.activeSubtaskId]);
 
@@ -178,7 +179,8 @@ export default function TaskDetailPage() {
   const totalEstimateMinutes = getTaskEstimateMinutes(task);
   const activeSubtask = task.subtasks.find((subtask) => subtask.id === timer.activeSubtaskId);
   const selectedSubtask = task.subtasks.find((subtask) => subtask.id === selectedSubtaskId);
-  const focusSubtask = activeSubtask ?? selectedSubtask ?? task.subtasks[0];
+  const firstIncompleteSubtask = task.subtasks.find((s) => !s.done);
+  const focusSubtask = activeSubtask ?? selectedSubtask ?? firstIncompleteSubtask ?? task.subtasks[0];
   const isActive = timer.activeTaskId === task.id;
   const isFocusedTimer = isActive && timer.activeSubtaskId === focusSubtask?.id;
   const isRunning = isFocusedTimer && timer.isRunning;
@@ -307,7 +309,8 @@ export default function TaskDetailPage() {
     setSubtaskEstimateDrafts(buildSubtaskEstimateDrafts(updated));
     await updateImmediate(updates);
     if (selectedSubtaskId === subId) {
-      setSelectedSubtaskId(updated[0]?.id ?? null);
+      const firstIncomplete = updated.find((s) => !s.done);
+      setSelectedSubtaskId(firstIncomplete?.id ?? updated[0]?.id ?? null);
     }
   };
 

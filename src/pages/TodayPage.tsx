@@ -180,8 +180,10 @@ export default function TodayPage() {
       return task.subtasks.find((subtask) => subtask.id === timer.activeSubtaskId);
     }
     const selectedId = projectSubtaskByTaskId[task.id];
+    const firstIncomplete = task.subtasks.find((s) => !s.done);
     return (
       task.subtasks.find((subtask) => subtask.id === selectedId) ??
+      firstIncomplete ??
       task.subtasks[0]
     );
   };
