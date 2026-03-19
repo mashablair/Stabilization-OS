@@ -86,6 +86,8 @@ export default function TaskDetailPage() {
   const [subtaskEstimateDrafts, setSubtaskEstimateDrafts] = useState<Record<string, string>>({});
   const migratedTaskId = useRef<string | null>(null);
   const [notesExpanded, setNotesExpanded] = useState(false);
+  const [showTaskCompletedDatePicker, setShowTaskCompletedDatePicker] = useState(false);
+  const [editingSubtaskCompletedId, setEditingSubtaskCompletedId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsEditingTitle(false);
@@ -99,6 +101,8 @@ export default function TaskDetailPage() {
     setMoneyImpactDraft("");
     setSubtaskEstimateDrafts({});
     setNotesExpanded(false);
+    setShowTaskCompletedDatePicker(false);
+    setEditingSubtaskCompletedId(null);
   }, [id]);
 
   useEffect(() => {
@@ -350,6 +354,24 @@ export default function TaskDetailPage() {
     navigate(-1);
   };
 
+  const changeTaskCompletedDate = async (dateStr: string) => {
+    if (!dateStr) return;
+    const iso = new Date(dateStr + "T12:00:00").toISOString();
+    setLocalTaskFields({ completedAt: iso });
+    await updateTask(task.id, { completedAt: iso, updatedAt: nowISO() });
+    setShowTaskCompletedDatePicker(false);
+  };
+
+  const changeSubtaskCompletedDate = async (subId: string, dateStr: string) => {
+    if (!dateStr) return;
+    const iso = new Date(dateStr + "T12:00:00").toISOString();
+    const updated = task.subtasks.map((s) =>
+      s.id === subId ? { ...s, completedAt: iso } : s
+    );
+    await updateImmediate({ subtasks: updated });
+    setEditingSubtaskCompletedId(null);
+  };
+
   const completedEntries = timeEntries
     .filter((entry) => entry.subtaskId === focusSubtask?.id)
     .filter((e) => e.endAt)
@@ -504,6 +526,32 @@ export default function TaskDetailPage() {
                   {task.title || <span className="text-slate-400 font-normal">Untitled task — click to rename</span>}
                 </button>
               )}
+              {task.status === "DONE" && (
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowTaskCompletedDatePicker(!showTaskCompletedDatePicker)}
+                    className="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors"
+                    title={`Completed ${task.completedAt ? new Date(task.completedAt).toLocaleDateString() : "— click to set date"}`}
+                  >
+                    <span className="material-symbols-outlined text-lg">calendar_month</span>
+                  </button>
+                  {showTaskCompletedDatePicker && (
+                    <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-3 min-w-[200px]">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">
+                        Completed on
+                      </label>
+                      <input
+                        type="date"
+                        value={task.completedAt ? task.completedAt.slice(0, 10) : ""}
+                        onChange={(e) => changeTaskCompletedDate(e.target.value)}
+                        className="w-full bg-slate-100 dark:bg-slate-700 border-none rounded-lg px-3 h-9 text-sm font-bold focus:ring-2 focus:ring-primary"
+                        autoFocus
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-2 items-center pl-10">
               <span className={`px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${PRIORITY_COLORS[task.priority]}`}>
@@ -604,51 +652,85 @@ export default function TaskDetailPage() {
                       {sub.title || <span className="text-slate-400 italic">Click to edit</span>}
                     </button>
                   )}
-                  <div className="w-[86px] shrink-0">
-                    <input
-                      type="number"
-                      min={0}
-                      value={subtaskEstimateDrafts[sub.id] ?? ""}
-                      onChange={(e) => updateSubtaskEstimateDraft(sub.id, e.target.value)}
-                      onBlur={commitSubtaskEstimates}
-                      className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-2 py-1.5 text-xs font-semibold text-right focus:ring-2 focus:ring-primary"
-                      placeholder="min"
-                      title="Subtask estimate in minutes"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedSubtaskId(sub.id);
-                      if (timer.activeTaskId === task.id && timer.activeSubtaskId === sub.id) {
-                        if (timer.isRunning) {
-                          timer.pauseTimer();
-                        } else {
-                          timer.startTimer(task.id, sub.id);
+                  {!sub.done && (
+                    <div className="w-[86px] shrink-0">
+                      <input
+                        type="number"
+                        min={0}
+                        value={subtaskEstimateDrafts[sub.id] ?? ""}
+                        onChange={(e) => updateSubtaskEstimateDraft(sub.id, e.target.value)}
+                        onBlur={commitSubtaskEstimates}
+                        className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-2 py-1.5 text-xs font-semibold text-right focus:ring-2 focus:ring-primary"
+                        placeholder="min"
+                        title="Subtask estimate in minutes"
+                      />
+                    </div>
+                  )}
+                  {!sub.done && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedSubtaskId(sub.id);
+                        if (timer.activeTaskId === task.id && timer.activeSubtaskId === sub.id) {
+                          if (timer.isRunning) {
+                            timer.pauseTimer();
+                          } else {
+                            timer.startTimer(task.id, sub.id);
+                          }
+                          return;
                         }
-                        return;
+                        timer.startTimer(task.id, sub.id);
+                      }}
+                      className={`size-8 rounded-lg flex items-center justify-center border transition-colors ${
+                        timer.activeTaskId === task.id && timer.activeSubtaskId === sub.id
+                          ? "border-primary text-primary"
+                          : "border-slate-200 dark:border-slate-700 text-slate-400 hover:text-primary hover:border-primary/50"
+                      }`}
+                      title={
+                        timer.activeTaskId === task.id && timer.activeSubtaskId === sub.id && timer.isRunning
+                          ? "Pause subtask timer"
+                          : "Start subtask timer"
                       }
-                      timer.startTimer(task.id, sub.id);
-                    }}
-                    className={`size-8 rounded-lg flex items-center justify-center border transition-colors ${
-                      timer.activeTaskId === task.id && timer.activeSubtaskId === sub.id
-                        ? "border-primary text-primary"
-                        : "border-slate-200 dark:border-slate-700 text-slate-400 hover:text-primary hover:border-primary/50"
-                    }`}
-                    title={
-                      timer.activeTaskId === task.id && timer.activeSubtaskId === sub.id && timer.isRunning
-                        ? "Pause subtask timer"
-                        : "Start subtask timer"
-                    }
-                  >
-                    <span className="material-symbols-outlined text-base">
-                      {timer.activeTaskId === task.id &&
-                      timer.activeSubtaskId === sub.id &&
-                      timer.isRunning
-                        ? "pause"
-                        : "play_arrow"}
-                    </span>
-                  </button>
+                    >
+                      <span className="material-symbols-outlined text-base">
+                        {timer.activeTaskId === task.id &&
+                        timer.activeSubtaskId === sub.id &&
+                        timer.isRunning
+                          ? "pause"
+                          : "play_arrow"}
+                      </span>
+                    </button>
+                  )}
+                  {sub.done && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditingSubtaskCompletedId(
+                            editingSubtaskCompletedId === sub.id ? null : sub.id
+                          )
+                        }
+                        className="size-7 rounded flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors"
+                        title={`Completed ${sub.completedAt ? new Date(sub.completedAt).toLocaleDateString() : "— click to set date"}`}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">calendar_month</span>
+                      </button>
+                      {editingSubtaskCompletedId === sub.id && (
+                        <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-2 min-w-[180px]">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">
+                            Completed on
+                          </label>
+                          <input
+                            type="date"
+                            value={sub.completedAt ? sub.completedAt.slice(0, 10) : ""}
+                            onChange={(e) => changeSubtaskCompletedDate(sub.id, e.target.value)}
+                            className="w-full bg-slate-100 dark:bg-slate-700 border-none rounded-lg px-2 h-8 text-xs font-bold focus:ring-2 focus:ring-primary"
+                            autoFocus
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {task.subtasks.length > 1 && (
                     <button
                       onClick={() => removeSubtask(sub.id)}
