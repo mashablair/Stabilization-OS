@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useAppSettings, useCategories, useTasks, useTimeEntries } from "../hooks/useData";
 import type { TaskDomain } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
@@ -16,8 +16,52 @@ import {
 
 type FilterTab = "All" | "Life" | "Builder";
 
+const FRICTION_DISMISSED_STORAGE_KEY = "balance-os:dashboard-friction-dismissed";
+
+function readDismissedFrictionKeys(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(FRICTION_DISMISSED_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((x): x is string => typeof x === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+type FrictionItem = {
+  dismissKey: string;
+  type: string;
+  text: string;
+  note: string;
+};
+
 export default function DashboardPage() {
   const [filterTab, setFilterTab] = useState<FilterTab>("All");
+  const [categoryChartShowPlanned, setCategoryChartShowPlanned] =
+    useState(false);
+  const [dismissedFrictionKeys, setDismissedFrictionKeys] = useState<
+    Set<string>
+  >(() => readDismissedFrictionKeys());
+
+  const dismissFrictionItem = useCallback((key: string) => {
+    setDismissedFrictionKeys((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      try {
+        window.localStorage.setItem(
+          FRICTION_DISMISSED_STORAGE_KEY,
+          JSON.stringify([...next])
+        );
+      } catch {
+        /* ignore quota / private mode */
+      }
+      return next;
+    });
+  }, []);
   const { data: settings } = useAppSettings();
   const { data: tasks = [] } = useTasks();
   const { data: categories = [] } = useCategories();
@@ -141,8 +185,8 @@ export default function DashboardPage() {
     return days;
   }, [filteredTasks, now]);
 
-  const frictionItems = useMemo(() => {
-    const items: Array<{ type: string; text: string; note: string }> = [];
+  const frictionItemsAll = useMemo(() => {
+    const items: FrictionItem[] = [];
     const recentEntries = filteredTimeEntries.filter(
       (e) => e.pauseReason && new Date(e.startAt) >= weekAgo
     );
@@ -153,6 +197,7 @@ export default function DashboardPage() {
     });
     reasons.forEach((count, reason) => {
       items.push({
+        dismissKey: `pause:${reason}`,
         type: "Pause",
         text: `"${reason}" interruption occurred ${count} time(s)`,
         note: "Consider batching or blocking time for this.",
@@ -164,6 +209,7 @@ export default function DashboardPage() {
       .slice(0, 5)
       .forEach((t) => {
         items.push({
+          dismissKey: `friction:${t.id}`,
           type: "Task Friction",
           text: `${t.title}: ${t.frictionNote}`,
           note: "Address the root cause to unblock progress.",
@@ -178,6 +224,7 @@ export default function DashboardPage() {
           t.actualSecondsTotal > 0
       )
       .map((t) => ({
+        id: t.id,
         title: t.title,
         est: t.estimateMinutes!,
         actual: Math.round(t.actualSecondsTotal / 60),
@@ -189,6 +236,7 @@ export default function DashboardPage() {
 
     mismatches.forEach((m) => {
       items.push({
+        dismissKey: `mismatch:${m.id}`,
         type: m.ratio > 1 ? "Over-estimate" : "Under-estimate",
         text: `${m.title}: estimated ${formatMinutes(m.est)}, actual ${formatMinutes(m.actual)}`,
         note: "Calibrate future estimates based on this.",
@@ -197,6 +245,12 @@ export default function DashboardPage() {
 
     return items;
   }, [filteredTasks, filteredTimeEntries, weekAgo]);
+
+  const frictionItems = useMemo(
+    () =>
+      frictionItemsAll.filter((item) => !dismissedFrictionKeys.has(item.dismissKey)),
+    [frictionItemsAll, dismissedFrictionKeys]
+  );
 
   const typeColors: Record<string, string> = {
     Pause: "border-primary/40",
@@ -212,26 +266,26 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 nav:px-12 pb-24 md:pb-8">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+    <div className="max-w-7xl mx-auto px-6 py-5 nav:px-12 pb-20 md:pb-5">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-5">
         <div>
-          <h2 className="text-3xl font-black tracking-tight">
+          <h2 className="text-2xl font-black tracking-tight">
             Weekly Dashboard
           </h2>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium">
+          <p className="text-slate-500 dark:text-slate-400 mt-0.5 text-sm font-medium">
             {weekAgo.toLocaleDateString()} –{" "}
             {now.toLocaleDateString()} • Retrospective
           </p>
         </div>
-        <div className="flex p-1.5 rounded-xl bg-slate-200 dark:bg-card-dark border border-slate-300 dark:border-border-dark w-full md:w-auto max-w-sm">
+        <div className="flex p-1 rounded-xl bg-slate-200 dark:bg-card-dark border border-slate-300 dark:border-border-dark w-full md:w-auto max-w-sm">
           {(["All", "Life", "Builder"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setFilterTab(t)}
-              className={`flex cursor-pointer h-10 flex-1 md:flex-initial md:min-w-[100px] items-center justify-center overflow-hidden rounded-lg px-4 transition-all text-sm font-semibold ${
+              className={`flex cursor-pointer h-8 flex-1 md:flex-initial md:min-w-[88px] items-center justify-center overflow-hidden rounded-lg px-3 transition-all text-xs font-semibold ${
                 filterTab === t
-                  ? "bg-gradient-accent text-white shadow-lg shadow-primary/20"
+                  ? "bg-gradient-accent text-white shadow-md shadow-primary/20"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -242,73 +296,111 @@ export default function DashboardPage() {
       </header>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <div className="bg-white dark:bg-slate-900 py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
             Work Completed
           </p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-gradient">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-bold text-gradient">
               {stats.completedCount}
             </span>
-            <span className="text-sm text-slate-500 dark:text-slate-400">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
               {stats.completedCount === 1 ? "task" : "tasks"}
             </span>
           </div>
           {stats.subtasksCompletedCount > 0 && (
-            <p className="text-xs text-slate-400 mt-1">
-              {stats.subtasksCompletedCount} {stats.subtasksCompletedCount === 1 ? "subtask" : "subtasks"} completed
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              {stats.subtasksCompletedCount} {stats.subtasksCompletedCount === 1 ? "subtask" : "subtasks"} done
             </p>
           )}
         </div>
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">
+        <div className="bg-white dark:bg-slate-900 py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
             Time Tracked
           </p>
-          <span className="text-2xl font-bold">
+          <span className="text-xl font-bold">
             {formatMinutes(Math.round(stats.totalSeconds / 60))}
           </span>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border-2 border-primary/20 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">
+        <div className="bg-white dark:bg-slate-900 py-2 px-3 rounded-xl border-2 border-primary/20 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
             Money Recovered
           </p>
-          <span className="text-2xl font-bold text-gradient">
+          <span className="text-xl font-bold text-gradient">
             ${stats.moneyRecovered.toFixed(2)}
           </span>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">
+        <div className="bg-white dark:bg-slate-900 py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
             Open Loops
           </p>
-          <span className="text-2xl font-bold text-gradient">
+          <span className="text-xl font-bold text-gradient">
             {stats.openLoops}
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 space-y-4">
           {/* Time Allocation */}
-          <section className="bg-white dark:bg-slate-900 p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <div className="mb-6">
-              <h3 className="text-lg font-bold">Time Allocation by Category</h3>
-              <p className="text-sm text-slate-500">
-                Planned vs actual minutes
-              </p>
+          <section className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+              <div>
+                <h3 className="text-base font-bold">
+                  Time Allocation by Category
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {categoryChartShowPlanned
+                    ? "Planned vs actual minutes"
+                    : "Actual minutes only"}
+                </p>
+              </div>
+              <div
+                className="inline-flex shrink-0 self-start sm:self-auto p-0.5 rounded-lg bg-slate-200 dark:bg-card-dark border border-slate-300 dark:border-border-dark"
+                role="group"
+                aria-label="Category chart series"
+              >
+                <button
+                  type="button"
+                  title="Actual time only"
+                  onClick={() => setCategoryChartShowPlanned(false)}
+                  className={`h-7 min-w-13 px-2 rounded-md text-[11px] font-semibold leading-none transition-all ${
+                    !categoryChartShowPlanned
+                      ? "bg-gradient-accent text-white shadow-sm shadow-primary/15"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Actual
+                </button>
+                <button
+                  type="button"
+                  title="Planned and actual"
+                  onClick={() => setCategoryChartShowPlanned(true)}
+                  className={`h-7 min-w-13 px-2 rounded-md text-[11px] font-semibold leading-none transition-all ${
+                    categoryChartShowPlanned
+                      ? "bg-gradient-accent text-white shadow-sm shadow-primary/15"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Both
+                </button>
+              </div>
             </div>
-            <div className="h-64">
+            <div className="h-52">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={catChartData}>
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip {...chartTooltipStyle} />
-                  <Legend />
-                  <Bar
-                    dataKey="Planned"
-                    fill="rgba(168, 85, 247, 0.3)"
-                    radius={[4, 4, 0, 0]}
-                  />
+                  {categoryChartShowPlanned && <Legend />}
+                  {categoryChartShowPlanned && (
+                    <Bar
+                      dataKey="Planned"
+                      fill="rgba(168, 85, 247, 0.3)"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  )}
                   <Bar
                     dataKey="Actual"
                     fill="url(#barGradient)"
@@ -332,21 +424,21 @@ export default function DashboardPage() {
           </section>
 
           {/* Open Loops Trend */}
-          <section className="bg-white dark:bg-slate-900 p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
+          <section className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-lg font-bold">Open Loops Trend</h3>
-                <p className="text-sm text-slate-500">
+                <h3 className="text-base font-bold">Open Loops Trend</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Unfinished tasks creating mental drag
                 </p>
               </div>
               {stats.openLoops > 10 && (
-                <span className="text-xs font-bold px-2 py-1 bg-pink-50 dark:bg-pink-950/30 text-pink-600 rounded">
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-pink-50 dark:bg-pink-950/30 text-pink-600 rounded">
                   Attention Needed
                 </span>
               )}
             </div>
-            <div className="h-48">
+            <div className="h-40">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={openLoopsTrend}>
                   <XAxis dataKey="day" tick={{ fontSize: 12 }} />
@@ -366,32 +458,52 @@ export default function DashboardPage() {
         </div>
 
         {/* Friction Log */}
-        <section className="bg-white dark:bg-slate-900 p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="mb-6">
+        <section className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="mb-4">
             <h3 className="text-lg font-bold">Friction Log</h3>
-            <p className="text-sm text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Bottlenecks identified this week
             </p>
           </div>
-          <div className="space-y-4">
-            {frictionItems.length === 0 && (
+          <div className="space-y-2">
+            {frictionItemsAll.length === 0 && (
               <p className="text-sm text-slate-400 italic">
                 No friction points logged yet. Add friction notes to tasks or
                 use pause reasons on your timer.
               </p>
             )}
-            {frictionItems.map((item, i) => (
+            {frictionItemsAll.length > 0 && frictionItems.length === 0 && (
+              <p className="text-sm text-slate-400 italic">
+                All current items are dismissed. New rows appear when new
+                friction is logged; clearing site data resets dismissed items.
+              </p>
+            )}
+            {frictionItems.map((item) => (
               <div
-                key={i}
-                className={`p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border-l-4 ${typeColors[item.type] ?? "border-slate-300"}`}
+                key={item.dismissKey}
+                className={`relative pl-2.5 pr-2 py-2 rounded-md bg-slate-50 dark:bg-slate-800/50 border-l-[3px] ${typeColors[item.type] ?? "border-slate-300"}`}
               >
-                <p
-                  className={`text-xs font-bold uppercase tracking-wider mb-1 ${typeLabelColors[item.type] ?? "text-slate-500"}`}
-                >
-                  {item.type}
+                <div className="flex items-center justify-between gap-1.5 mb-0.5">
+                  <p
+                    className={`text-[10px] font-bold uppercase tracking-wide leading-tight ${typeLabelColors[item.type] ?? "text-slate-500"}`}
+                  >
+                    {item.type}
+                  </p>
+                  <button
+                    type="button"
+                    aria-label="Remove from friction log"
+                    onClick={() => dismissFrictionItem(item.dismissKey)}
+                    className="shrink-0 flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-slate-200/90 hover:text-slate-600 dark:hover:bg-slate-700/90 dark:hover:text-slate-300 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[14px] leading-none font-normal">
+                      close
+                    </span>
+                  </button>
+                </div>
+                <p className="text-xs font-medium text-slate-800 dark:text-slate-200 leading-snug">
+                  {item.text}
                 </p>
-                <p className="text-sm font-medium">{item.text}</p>
-                <p className="text-[10px] text-slate-400 mt-2 italic">
+                <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-1 leading-snug italic">
                   {item.note}
                 </p>
               </div>
@@ -400,15 +512,15 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      <footer className="mt-12 p-8 vibrant-gradient-soft rounded-xl border border-primary/10 flex flex-col md:flex-row items-center gap-6">
-        <div className="w-12 h-12 rounded-full bg-gradient-accent flex items-center justify-center shrink-0 text-white shadow-lg shadow-primary/20">
-          <span className="material-symbols-outlined text-2xl">
+      <footer className="mt-6 p-5 vibrant-gradient-soft rounded-xl border border-primary/10 flex flex-col md:flex-row items-center gap-4">
+        <div className="w-9 h-9 rounded-full bg-gradient-accent flex items-center justify-center shrink-0 text-white shadow-md shadow-primary/20">
+          <span className="material-symbols-outlined text-lg">
             auto_awesome
           </span>
         </div>
         <div>
-          <h4 className="font-bold text-primary">Balance Insight</h4>
-          <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+          <h4 className="font-bold text-sm text-primary">Balance Insight</h4>
+          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
             You have <strong>{stats.openLoops} open loops</strong> creating
             mental drag. Focus on completing small tasks first to build momentum
             and reduce cognitive load.
