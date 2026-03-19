@@ -56,6 +56,7 @@ export interface Subtask {
   done: boolean;
   estimateMinutes?: number;
   actualSecondsTotal?: number;
+  completedAt?: string;
 }
 
 export interface TimeEntry {

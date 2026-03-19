@@ -286,12 +286,15 @@ export default function TaskDetailPage() {
   };
 
   const toggleSubtask = async (subId: string) => {
+    const now = nowISO();
     const updated = task.subtasks.map((s) =>
-      s.id === subId ? { ...s, done: !s.done } : s
+      s.id === subId
+        ? { ...s, done: !s.done, completedAt: !s.done ? now : undefined }
+        : s
     );
     await updateImmediate({ subtasks: updated });
     if (updated.length > 0 && updated.every((s) => s.done) && task.status !== "DONE") {
-      setLocalTaskFields({ status: "DONE", completedAt: nowISO() });
+      setLocalTaskFields({ status: "DONE", completedAt: now });
       await markTaskDone(task.id);
     }
   };

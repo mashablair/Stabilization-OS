@@ -115,20 +115,41 @@ export default function TodayPage() {
 
   const spentMins = tab === "Life" ? stabilizerSpentMins : builderSpentMins;
 
+  type DoneTodayItem =
+    | { kind: "task"; task: (typeof allTasks)[0] }
+    | { kind: "partial"; task: (typeof allTasks)[0]; subtasks: (typeof allTasks)[0]["subtasks"] };
+
   const doneToday = useMemo(() => {
     const domain = tab === "Life" ? "LIFE_ADMIN" : "BUSINESS";
-    return allTasks
-      .filter(
-        (t) =>
-          t.domain === domain &&
-          (t.status === "DONE" || t.status === "ARCHIVED") &&
-          t.completedAt &&
-          new Date(t.completedAt).getTime() >= todayStart
-      )
-      .sort(
-        (a, b) =>
-          new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime()
+    const items: DoneTodayItem[] = [];
+
+    for (const t of allTasks) {
+      if (t.domain !== domain) continue;
+      const isFullyDone = (t.status === "DONE" || t.status === "ARCHIVED") &&
+        t.completedAt && new Date(t.completedAt).getTime() >= todayStart;
+      if (isFullyDone) {
+        items.push({ kind: "task", task: t });
+        continue;
+      }
+      const todaySubs = t.subtasks.filter(
+        (s) => s.done && s.completedAt && new Date(s.completedAt).getTime() >= todayStart
       );
+      if (todaySubs.length > 0) {
+        items.push({ kind: "partial", task: t, subtasks: todaySubs });
+      }
+    }
+
+    items.sort((a, b) => {
+      const aTime = a.kind === "task"
+        ? new Date(a.task.completedAt!).getTime()
+        : Math.max(...a.subtasks.map((s) => new Date(s.completedAt!).getTime()));
+      const bTime = b.kind === "task"
+        ? new Date(b.task.completedAt!).getTime()
+        : Math.max(...b.subtasks.map((s) => new Date(s.completedAt!).getTime()));
+      return bTime - aTime;
+    });
+
+    return items;
   }, [allTasks, tab, todayStart]);
 
   const todayTasks = tab === "Life" ? stabilizerTasks : builderActionable;
@@ -683,41 +704,72 @@ export default function TodayPage() {
                   <span className="material-symbols-outlined text-2xl text-green-500">celebration</span>
                   <p className="text-sm font-medium text-green-700 dark:text-green-300">
                     {doneToday.length === 1
-                      ? "You knocked one out! Every task closed is a loop that stops draining your energy."
+                      ? "You knocked one out! Every step closed is a loop that stops draining your energy."
                       : doneToday.length < 4
-                        ? `${doneToday.length} tasks done — you're building real momentum. Keep going!`
-                        : `${doneToday.length} tasks done today — incredible! You're proving to yourself what's possible.`}
+                        ? `${doneToday.length} items done — you're building real momentum. Keep going!`
+                        : `${doneToday.length} items done today — incredible! You're proving to yourself what's possible.`}
                   </p>
                 </div>
 
-                {doneToday.map((task) => {
-                  const cat = catMap.get(task.categoryId);
+                {doneToday.map((item) => {
+                  const cat = catMap.get(item.task.categoryId);
+                  if (item.kind === "task") {
+                    return (
+                      <div
+                        key={item.task.id}
+                        className="bg-white/40 dark:bg-card-dark/30 border border-green-200/50 dark:border-green-800/20 rounded-xl p-4 flex items-center justify-between gap-4"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <button
+                            onClick={() => unmarkTaskDone(item.task.id)}
+                            className="size-6 rounded-full bg-linear-to-br from-green-400 to-emerald-500 flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity"
+                            title="Undo"
+                          >
+                            <span className="material-symbols-outlined text-white text-sm">check</span>
+                          </button>
+                          <Link to={`/tasks/${item.task.id}`} className="flex-1 min-w-0 hover:text-primary transition-colors">
+                            <h4 className="font-semibold truncate text-slate-400 line-through text-sm">{item.task.title}</h4>
+                            <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
+                              {cat && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-100 dark:bg-border-dark">
+                                  {cat.name}
+                                </span>
+                              )}
+                              {getTaskActualSeconds(item.task) > 0 && (
+                                <span>{formatMinutes(Math.round(getTaskActualSeconds(item.task) / 60))}</span>
+                              )}
+                            </div>
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <div
-                      key={task.id}
-                      className="bg-white/40 dark:bg-card-dark/30 border border-green-200/50 dark:border-green-800/20 rounded-xl p-4 flex items-center justify-between gap-4"
+                      key={`partial-${item.task.id}`}
+                      className="bg-white/40 dark:bg-card-dark/30 border border-green-200/50 dark:border-green-800/20 rounded-xl p-4"
                     >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <button
-                          onClick={() => unmarkTaskDone(task.id)}
-                          className="size-6 rounded-full bg-linear-to-br from-green-400 to-emerald-500 flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity"
-                          title="Undo"
-                        >
-                          <span className="material-symbols-outlined text-white text-sm">check</span>
-                        </button>
-                        <Link to={`/tasks/${task.id}`} className="flex-1 min-w-0 hover:text-primary transition-colors">
-                          <h4 className="font-semibold truncate text-slate-400 line-through text-sm">{task.title}</h4>
-                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
-                            {cat && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-100 dark:bg-border-dark">
-                                {cat.name}
-                              </span>
-                            )}
-                            {getTaskActualSeconds(task) > 0 && (
-                              <span>{formatMinutes(Math.round(getTaskActualSeconds(task) / 60))}</span>
+                      <Link to={`/tasks/${item.task.id}`} className="hover:text-primary transition-colors">
+                        <h4 className="font-semibold truncate text-sm">{item.task.title}</h4>
+                      </Link>
+                      <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
+                        {cat && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-100 dark:bg-border-dark">
+                            {cat.name}
+                          </span>
+                        )}
+                        <span>{item.subtasks.length}/{item.task.subtasks.length} subtasks</span>
+                      </div>
+                      <div className="mt-2 space-y-1 pl-1">
+                        {item.subtasks.map((sub) => (
+                          <div key={sub.id} className="flex items-center gap-2 text-xs">
+                            <span className="material-symbols-outlined text-green-500 text-sm">check_circle</span>
+                            <span className="text-slate-400 line-through truncate">{sub.title}</span>
+                            {(sub.actualSecondsTotal ?? 0) > 0 && (
+                              <span className="text-slate-400 shrink-0">{formatMinutes(Math.round((sub.actualSecondsTotal ?? 0) / 60))}</span>
                             )}
                           </div>
-                        </Link>
+                        ))}
                       </div>
                     </div>
                   );

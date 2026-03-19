@@ -85,6 +85,15 @@ export default function DashboardPage() {
     );
     const completedCount = recentDone.length;
 
+    let subtasksCompletedCount = 0;
+    for (const t of filteredTasks) {
+      for (const s of t.subtasks) {
+        if (s.done && s.completedAt && new Date(s.completedAt) >= weekAgo) {
+          subtasksCompletedCount++;
+        }
+      }
+    }
+
     const recentEntries = filteredTimeEntries.filter(
       (e) => e.endAt && new Date(e.startAt) >= weekAgo
     );
@@ -98,7 +107,7 @@ export default function DashboardPage() {
       (t) => t.status !== "DONE" && t.status !== "ARCHIVED"
     ).length;
 
-    return { completedCount, totalSeconds, moneyRecovered, openLoops };
+    return { completedCount, subtasksCompletedCount, totalSeconds, moneyRecovered, openLoops };
   }, [filteredTasks, filteredTimeEntries, weekAgo]);
 
   const catChartData = useMemo(() => {
@@ -236,11 +245,21 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">
-            Tasks Completed
+            Work Completed
           </p>
-          <span className="text-2xl font-bold text-gradient">
-            {stats.completedCount}
-          </span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-gradient">
+              {stats.completedCount}
+            </span>
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              {stats.completedCount === 1 ? "task" : "tasks"}
+            </span>
+          </div>
+          {stats.subtasksCompletedCount > 0 && (
+            <p className="text-xs text-slate-400 mt-1">
+              {stats.subtasksCompletedCount} {stats.subtasksCompletedCount === 1 ? "subtask" : "subtasks"} completed
+            </p>
+          )}
         </div>
         <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">
