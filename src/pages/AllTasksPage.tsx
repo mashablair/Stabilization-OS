@@ -16,6 +16,7 @@ import {
 import type { Task } from "../db";
 import { formatMinutes } from "../hooks/useTimer";
 import LogTaskModal from "../components/LogTaskModal";
+import QuickEntryModal from "../components/QuickEntryModal";
 
 type DomainTab = "Life" | "Builder";
 type DoneTab = "Completed" | "Archived";
@@ -53,6 +54,7 @@ export default function AllTasksPage() {
   const [doneTab, setDoneTab] = useState<DoneTab>("Completed");
   const [pendingOpen, setPendingOpen] = useState(false);
   const [showLogTaskModal, setShowLogTaskModal] = useState(false);
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
 
   const domain = domainTab === "Life" ? "LIFE_ADMIN" : "BUSINESS";
   const actionableTasks = allTasks.filter(
@@ -159,14 +161,24 @@ export default function AllTasksPage() {
                 : "Pin tasks to prioritize them at the top of your Builder Queue."}
             </p>
           </div>
-          <button
-            onClick={() => setShowLogTaskModal(true)}
-            className="shrink-0 text-slate-600 dark:text-slate-400 text-sm font-semibold flex items-center gap-1 hover:text-primary transition-colors"
-            title="Log Task"
-          >
-            <span className="material-symbols-outlined text-sm">history_edu</span>
-            Log Task
-          </button>
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={() => setShowLogTaskModal(true)}
+              className="text-slate-500 dark:text-slate-400 text-xs font-semibold flex items-center gap-1 hover:text-primary transition-colors"
+              title="Log Task"
+            >
+              <span className="material-symbols-outlined text-[16px]">history_edu</span>
+              Log
+            </button>
+            <button
+              onClick={() => setShowAddTaskModal(true)}
+              className="text-primary text-xs font-bold flex items-center gap-1 hover:text-primary/80 transition-colors"
+              title="Add Task"
+            >
+              <span className="material-symbols-outlined text-[16px]">add_circle</span>
+              Add
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -431,6 +443,11 @@ export default function AllTasksPage() {
         onClose={() => setShowLogTaskModal(false)}
         defaultDomain={domain}
         defaultDate={today}
+      />
+      <QuickEntryModal
+        open={showAddTaskModal}
+        onClose={() => setShowAddTaskModal(false)}
+        defaultDomain={domain}
       />
     </div>
   );
