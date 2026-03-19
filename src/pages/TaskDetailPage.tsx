@@ -32,8 +32,6 @@ const PRIORITY_COLORS: Record<number, string> = {
 };
 
 type TaskDraftField =
-  | "contextCard"
-  | "frictionNote"
   | "notes"
   | "nextActionAt"
   | "pendingReason"
@@ -58,8 +56,6 @@ function buildSubtaskEstimateDrafts(subtasks: Subtask[]): Record<string, string>
 function mergeTaskDraft(remoteTask: Task, draftTask: Task, dirtyFields: Set<TaskDraftField>): Task {
   return {
     ...remoteTask,
-    contextCard: dirtyFields.has("contextCard") ? draftTask.contextCard : remoteTask.contextCard,
-    frictionNote: dirtyFields.has("frictionNote") ? draftTask.frictionNote : remoteTask.frictionNote,
     notes: dirtyFields.has("notes") ? draftTask.notes : remoteTask.notes,
     nextActionAt: dirtyFields.has("nextActionAt") ? draftTask.nextActionAt : remoteTask.nextActionAt,
     pendingReason: dirtyFields.has("pendingReason") ? draftTask.pendingReason : remoteTask.pendingReason,
@@ -89,6 +85,7 @@ export default function TaskDetailPage() {
   const [moneyImpactDraft, setMoneyImpactDraft] = useState("");
   const [subtaskEstimateDrafts, setSubtaskEstimateDrafts] = useState<Record<string, string>>({});
   const migratedTaskId = useRef<string | null>(null);
+  const [notesExpanded, setNotesExpanded] = useState(false);
 
   useEffect(() => {
     setIsEditingTitle(false);
@@ -101,6 +98,7 @@ export default function TaskDetailPage() {
     setEstimateMinutesDraft("");
     setMoneyImpactDraft("");
     setSubtaskEstimateDrafts({});
+    setNotesExpanded(false);
   }, [id]);
 
   useEffect(() => {
@@ -223,8 +221,6 @@ export default function TaskDetailPage() {
   const buildTaskUpdateForFields = (fields: TaskDraftField[]): Partial<Task> => {
     const updates: Partial<Task> = {};
     for (const field of fields) {
-      if (field === "contextCard") updates.contextCard = task.contextCard;
-      if (field === "frictionNote") updates.frictionNote = task.frictionNote;
       if (field === "notes") updates.notes = task.notes;
       if (field === "nextActionAt") updates.nextActionAt = task.nextActionAt;
       if (field === "pendingReason") updates.pendingReason = task.pendingReason;
@@ -243,8 +239,6 @@ export default function TaskDetailPage() {
     if (pendingFields.length === 0 || !remoteTask) return;
     const updates = buildTaskUpdateForFields(pendingFields);
     const hasChanges = pendingFields.some((field) => {
-      if (field === "contextCard") return JSON.stringify(task.contextCard) !== JSON.stringify(remoteTask.contextCard);
-      if (field === "frictionNote") return task.frictionNote !== remoteTask.frictionNote;
       if (field === "notes") return task.notes !== remoteTask.notes;
       if (field === "nextActionAt") return task.nextActionAt !== remoteTask.nextActionAt;
       if (field === "pendingReason") return task.pendingReason !== remoteTask.pendingReason;
@@ -427,8 +421,8 @@ export default function TaskDetailPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto w-full px-4 lg:px-10 py-8 pb-24 md:pb-8">
-      <div className="flex items-center gap-2 mb-6 text-sm">
+    <div className="max-w-7xl mx-auto w-full px-4 lg:px-8 py-4 pb-20 md:pb-4">
+      <div className="flex items-center gap-2 mb-3 text-sm">
         <Link to="/categories" className="text-slate-500 hover:text-primary">
           Categories
         </Link>
@@ -444,12 +438,12 @@ export default function TaskDetailPage() {
         <span className="font-medium">Task Detail</span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Main Column */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
+        <div className="lg:col-span-8 flex flex-col gap-4">
           {/* Title & Meta */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-3">
               <button
                 onClick={async () => {
                   if (task.status === "DONE") {
@@ -460,7 +454,7 @@ export default function TaskDetailPage() {
                     await markTaskDone(task.id);
                   }
                 }}
-                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${
+                className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${
                   task.status === "DONE"
                     ? "bg-gradient-accent border-transparent"
                     : "border-slate-300 dark:border-slate-600 hover:border-primary"
@@ -472,7 +466,7 @@ export default function TaskDetailPage() {
               </button>
               {isEditingTitle ? (
                 <input
-                  className="text-3xl lg:text-4xl font-black tracking-tight bg-transparent border-none focus:ring-0 p-0 w-full focus:outline-none border-b-2 border-primary"
+                  className="text-2xl lg:text-3xl font-black tracking-tight bg-transparent border-none focus:ring-0 p-0 w-full focus:outline-none border-b-2 border-primary"
                   value={editingTitle}
                   onChange={(e) => setEditingTitle(e.target.value)}
                   onBlur={async () => {
@@ -502,13 +496,13 @@ export default function TaskDetailPage() {
                     setEditingTitle(task.title);
                     setIsEditingTitle(true);
                   }}
-                  className="text-3xl lg:text-4xl font-semibold tracking-tight p-0 w-full text-left hover:opacity-80 transition-opacity min-h-[1.5em]"
+                  className="text-2xl lg:text-3xl font-semibold tracking-tight p-0 w-full text-left hover:opacity-80 transition-opacity min-h-[1.5em]"
                 >
                   {task.title || <span className="text-slate-400 font-normal">Untitled task — click to rename</span>}
                 </button>
               )}
             </div>
-            <div className="flex flex-wrap gap-3 items-center pl-12">
+            <div className="flex flex-wrap gap-2 items-center pl-10">
               <span className={`px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${PRIORITY_COLORS[task.priority]}`}>
                 {PRIORITY_LABELS[task.priority]} Priority
               </span>
@@ -546,71 +540,19 @@ export default function TaskDetailPage() {
             </div>
           </div>
 
-          {/* Context Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center gap-2 mb-3 text-slate-400">
-                <span className="material-symbols-outlined text-xl">psychology</span>
-                <h3 className="text-xs font-bold uppercase tracking-widest">The Why</h3>
-              </div>
-              <textarea
-                className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm text-slate-600 dark:text-slate-400 resize-none min-h-[80px] focus:outline-none"
-                placeholder="Why does this matter?"
-                value={task.contextCard.why}
-                onChange={(e) => {
-                  setLocalTaskFields({ contextCard: { ...task.contextCard, why: e.target.value } });
-                  markDirty("contextCard");
-                }}
-                onBlur={() => commitDraftFields("contextCard")}
-              />
-            </div>
-            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl shadow-md border-2 border-primary/30">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="material-symbols-outlined text-xl text-gradient">report_problem</span>
-                <h3 className="text-xs font-bold uppercase tracking-widest text-gradient">Friction Note</h3>
-              </div>
-              <textarea
-                className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm font-semibold resize-none min-h-[80px] focus:outline-none"
-                placeholder="What's making this hard?"
-                value={task.frictionNote ?? ""}
-                onChange={(e) => {
-                  setLocalTaskFields({ frictionNote: e.target.value });
-                  markDirty("frictionNote");
-                }}
-                onBlur={() => commitDraftFields("frictionNote")}
-              />
-            </div>
-            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center gap-2 mb-3 text-slate-400">
-                <span className="material-symbols-outlined text-xl">change_circle</span>
-                <h3 className="text-xs font-bold uppercase tracking-widest">Reframe</h3>
-              </div>
-              <textarea
-                className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm text-slate-600 dark:text-slate-400 resize-none min-h-[80px] focus:outline-none"
-                placeholder="How can you look at this differently?"
-                value={task.contextCard.reframe}
-                onChange={(e) => {
-                  setLocalTaskFields({ contextCard: { ...task.contextCard, reframe: e.target.value } });
-                  markDirty("contextCard");
-                }}
-                onBlur={() => commitDraftFields("contextCard")}
-              />
-            </div>
-          </div>
-
           {/* Subtasks */}
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-              <h3 className="font-bold">Subtasks</h3>
-              <span className="text-xs text-slate-500 font-medium bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-                {task.subtasks.filter((s) => s.done).length} / {task.subtasks.length} Complete
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+              <h3 className="font-bold text-sm">Subtasks</h3>
+              <span className="text-xs text-slate-500 font-medium bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg">
+                {task.subtasks.filter((s) => s.done).length} / {task.subtasks.length} done
               </span>
             </div>
-            <div className="p-2">
+            <div className="p-1.5">
               {task.subtasks.map((sub) => (
                 <div
                   key={sub.id}
-                  className="flex items-start gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg group"
+                  className="flex items-start gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg group"
                 >
                   <button
                     onClick={() => toggleSubtask(sub.id)}
@@ -714,8 +656,8 @@ export default function TaskDetailPage() {
                   )}
                 </div>
               ))}
-              <div className="flex items-center gap-2 p-3">
-                <span className="material-symbols-outlined text-primary">add</span>
+              <div className="flex items-center gap-2 p-2">
+                <span className="material-symbols-outlined text-primary text-base">add</span>
                 <input
                   className="flex-1 bg-transparent border-none focus:ring-0 p-0 text-sm placeholder:text-slate-400 focus:outline-none"
                   placeholder="Add a subtask..."
@@ -729,40 +671,49 @@ export default function TaskDetailPage() {
 
           {/* Notes */}
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-              <span className="material-symbols-outlined text-slate-400">notes</span>
-              <h3 className="font-bold">Notes</h3>
-            </div>
-            <div className="p-6">
-              <textarea
-                className="w-full bg-transparent border-none focus:ring-0 p-0 text-slate-700 dark:text-slate-300 leading-relaxed min-h-[120px] focus:outline-none"
-                placeholder="Add deeper details, links, or thoughts here..."
-                value={task.notes ?? ""}
-                onChange={(e) => {
-                  setLocalTaskFields({ notes: e.target.value });
-                  markDirty("notes");
-                }}
-                onBlur={() => commitDraftFields("notes")}
-              />
-            </div>
+            <button
+              type="button"
+              onClick={() => setNotesExpanded((v) => !v)}
+              className="w-full px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-slate-400 text-base">notes</span>
+                <h3 className="font-bold text-sm">Notes</h3>
+              </div>
+              <span className="material-symbols-outlined text-slate-400">
+                {notesExpanded ? "expand_less" : "expand_more"}
+              </span>
+            </button>
+            {notesExpanded && (
+              <div className="p-4">
+                <textarea
+                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm text-slate-700 dark:text-slate-300 leading-relaxed min-h-[100px] focus:outline-none"
+                  placeholder="Add deeper details, links, or thoughts here..."
+                  value={task.notes ?? ""}
+                  onChange={(e) => {
+                    setLocalTaskFields({ notes: e.target.value });
+                    markDirty("notes");
+                  }}
+                  onBlur={() => commitDraftFields("notes")}
+                />
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right Sidebar */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className="lg:col-span-4 flex flex-col gap-4">
           {task.status === "PENDING" ? (
             /* Waiting block — replaces timer when PENDING */
-            <div className="bg-amber-50 dark:bg-amber-950/20 rounded-2xl border-2 border-amber-300 dark:border-amber-700/50 shadow-sm p-8 flex flex-col items-center gap-5">
-              <div className="size-14 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-3xl text-amber-600 dark:text-amber-400">hourglass_top</span>
-              </div>
-              <div className="text-amber-700 dark:text-amber-300 text-xs font-bold uppercase tracking-widest">
-                Waiting
+            <div className="bg-amber-50 dark:bg-amber-950/20 rounded-2xl border-2 border-amber-300 dark:border-amber-700/50 shadow-sm p-5 flex flex-col items-center gap-4">
+              <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                <span className="material-symbols-outlined text-xl text-amber-600 dark:text-amber-400">hourglass_top</span>
+                <span className="text-xs font-bold uppercase tracking-widest">Waiting</span>
               </div>
 
-              <div className="w-full space-y-4">
+              <div className="w-full space-y-3">
                 <div>
-                  <label className="block text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1.5">
+                  <label className="block text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1">
                     Next Action Date
                   </label>
                   <input
@@ -773,22 +724,22 @@ export default function TaskDetailPage() {
                       markDirty("nextActionAt");
                     }}
                     onBlur={() => commitDraftFields("nextActionAt")}
-                    className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 h-12 text-sm font-bold focus:ring-2 focus:ring-amber-400"
+                    className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/50 rounded-lg px-3 h-9 text-sm font-bold focus:ring-2 focus:ring-amber-400"
                     autoFocus={!task.nextActionAt}
                   />
                   {!task.nextActionAt && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
                       <span className="material-symbols-outlined text-xs">warning</span>
-                      Set a date so this task moves to the Waiting list
+                      Set a date so this task moves to Waiting
                     </p>
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1.5">
+                  <label className="block text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1">
                     Reason
                   </label>
                   <input
-                    className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 h-12 text-sm focus:ring-2 focus:ring-amber-400"
+                    className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/50 rounded-lg px-3 h-9 text-sm focus:ring-2 focus:ring-amber-400"
                     placeholder="e.g. Waiting for response..."
                     value={task.pendingReason ?? ""}
                     onChange={(e) => {
@@ -805,7 +756,7 @@ export default function TaskDetailPage() {
                   clearDirty("nextActionAt", "pendingReason");
                   updateImmediate({ status: "BACKLOG", nextActionAt: undefined, pendingReason: undefined });
                 }}
-                className="w-full mt-2 py-3 rounded-xl border-2 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 font-bold text-sm hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all flex items-center justify-center gap-2"
+                className="w-full py-2 rounded-lg border-2 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 font-bold text-sm hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all flex items-center justify-center gap-2"
               >
                 <span className="material-symbols-outlined text-sm">play_arrow</span>
                 Make Actionable Now
@@ -813,7 +764,7 @@ export default function TaskDetailPage() {
             </div>
           ) : (
             /* Focus Timer — shown for all non-PENDING statuses */
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-8 flex flex-col items-center gap-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 flex flex-col items-center gap-3">
               <div className="text-slate-400 text-xs font-bold uppercase tracking-widest">
                 Subtask Timer
               </div>
@@ -822,24 +773,24 @@ export default function TaskDetailPage() {
                   {focusSubtask.title}
                 </div>
               ) : null}
-              <div className="text-5xl font-black font-mono tabular-nums tracking-tighter">
+              <div className="text-4xl font-black font-mono tabular-nums tracking-tighter">
                 {isFocusedTimer
                   ? formatTime(timer.elapsed)
                   : formatTime(focusSubtask?.actualSecondsTotal ?? 0)}
               </div>
-              <div className="flex gap-3 w-full mt-2">
+              <div className="flex gap-2 w-full">
                 {isRunning ? (
                   <>
                     <button
                       onClick={() => timer.pauseTimer()}
-                      className="flex-1 bg-gradient-accent text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-primary/20"
+                      className="flex-1 bg-gradient-accent text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-primary/20"
                     >
                       <span className="material-symbols-outlined">pause</span>
                       Pause
                     </button>
                     <button
                       onClick={() => timer.stopTimer()}
-                      className="px-5 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="px-4 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       <span className="material-symbols-outlined">stop</span>
                     </button>
@@ -848,14 +799,14 @@ export default function TaskDetailPage() {
                   <>
                     <button
                       onClick={() => timer.startTimer(task.id, focusSubtask?.id)}
-                      className="flex-1 bg-gradient-accent text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-primary/20"
+                      className="flex-1 bg-gradient-accent text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-primary/20"
                     >
                       <span className="material-symbols-outlined">play_arrow</span>
                       Resume
                     </button>
                     <button
                       onClick={() => timer.stopTimer()}
-                      className="px-5 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="px-4 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       <span className="material-symbols-outlined">stop</span>
                     </button>
@@ -864,7 +815,7 @@ export default function TaskDetailPage() {
                   <button
                     onClick={() => timer.startTimer(task.id, focusSubtask?.id)}
                     disabled={!focusSubtask}
-                    className="flex-1 bg-gradient-accent text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-primary/20"
+                    className="flex-1 bg-gradient-accent text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-primary/20"
                   >
                     <span className="material-symbols-outlined">play_arrow</span>
                     Start Focus
@@ -880,39 +831,39 @@ export default function TaskDetailPage() {
                   value={addTimeInput}
                   onChange={(e) => setAddTimeInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addManualTime()}
-                  className="flex-1 w-[100px] min-w-[100px] bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-primary focus:outline-none"
+                  className="flex-1 min-w-0 bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-2.5 py-1.5 text-sm font-mono focus:ring-2 focus:ring-primary focus:outline-none"
                 />
                 <span className="text-xs text-slate-500">min</span>
                 <button
                   type="button"
                   onClick={addManualTime}
                   disabled={!parseAddTimeInput(addTimeInput) || !focusSubtask}
-                  className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Add
                 </button>
               </div>
 
               {completedEntries.length > 0 && (
-                <div className="w-full pt-6 border-t border-slate-100 dark:border-slate-800 mt-2">
-                  <div className="flex justify-between items-center text-xs mb-3">
+                <div className="w-full pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex justify-between items-center text-xs mb-2">
                     <span className="text-slate-500 font-medium">Session History</span>
                     <span className="font-bold text-gradient">
                       Total: {formatMinutes(Math.round((focusSubtask?.actualSecondsTotal ?? 0) / 60))}
                     </span>
                   </div>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
                     {completedEntries.map((entry) => (
                       <div
                         key={entry.id}
-                        className="flex justify-between items-center gap-2 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg"
+                        className="flex justify-between items-center gap-2 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-2.5 py-2 rounded-lg"
                       >
                         <span className="flex-1 min-w-0 truncate">{new Date(entry.startAt).toLocaleString()}</span>
                         <span className="font-mono shrink-0">{formatTime(entry.seconds)}</span>
                         <button
                           type="button"
                           onClick={() => removeSession(entry)}
-                          className="shrink-0 p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          className="shrink-0 p-0.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                           title="Remove session"
                         >
                           <span className="material-symbols-outlined text-base">close</span>
@@ -926,15 +877,15 @@ export default function TaskDetailPage() {
           )}
 
           {/* Fields */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-5">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 space-y-3">
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-                Total Time Estimate (sum of subtasks)
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+                Time Estimate
               </label>
-              <div className="bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center px-4 h-12 border border-transparent transition-all">
+              <div className="bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center px-3 h-9 border border-transparent transition-all">
                 <span className="material-symbols-outlined text-slate-400 text-sm">timer</span>
                 <input
-                  className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none pl-2.5"
+                  className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none pl-2"
                   type="number"
                   value={totalEstimateMinutes}
                   disabled
@@ -945,13 +896,13 @@ export default function TaskDetailPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
                 Priority
               </label>
               <select
                 value={task.priority}
                 onChange={(e) => updateImmediate({ priority: Number(e.target.value) as 1 | 2 | 3 | 4 })}
-                className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 h-12 text-sm font-bold"
+                className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 h-9 text-sm font-bold"
               >
                 {[1, 2, 3, 4].map((p) => (
                   <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
@@ -960,26 +911,26 @@ export default function TaskDetailPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
                 Due Date
               </label>
               <input
                 type="date"
                 value={task.dueDate ? task.dueDate.slice(0, 10) : ""}
                 onChange={(e) => updateImmediate({ dueDate: e.target.value ? new Date(e.target.value).toISOString() : undefined })}
-                className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 h-12 text-sm font-bold"
+                className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 h-9 text-sm font-bold"
               />
             </div>
 
             {cat?.kind === "MONEY" && (
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
                   Money Impact ($)
                 </label>
-                <div className="bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center px-4 h-12 border border-transparent focus-within:border-primary transition-all">
+                <div className="bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center px-3 h-9 border border-transparent focus-within:border-primary transition-all">
                   <span className="material-symbols-outlined text-gradient text-sm">payments</span>
                   <input
-                    className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none pl-2.5"
+                    className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none pl-2"
                     type="number"
                     value={moneyImpactDraft}
                     onChange={(e) => {
@@ -994,7 +945,7 @@ export default function TaskDetailPage() {
             )}
 
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
                 Domain
               </label>
               <div className="flex gap-2">
@@ -1011,7 +962,7 @@ export default function TaskDetailPage() {
                         ...(defaultCatId && { categoryId: defaultCatId }),
                       })
                     }
-                    className={`flex-1 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                    className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
                       task.domain === d
                         ? "bg-primary/10 text-primary border-primary"
                         : "border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-400"
@@ -1024,13 +975,13 @@ export default function TaskDetailPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
                 Category
               </label>
               <select
                 value={task.categoryId}
                 onChange={(e) => updateImmediate({ categoryId: e.target.value })}
-                className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 h-12 text-sm font-bold"
+                className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 h-9 text-sm font-bold"
               >
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
