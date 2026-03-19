@@ -15,6 +15,8 @@ import {
 } from "../db";
 
 function makeTask(overrides: Partial<Task> = {}): Task {
+  const est = overrides.estimateMinutes ?? 30;
+  const act = overrides.actualSecondsTotal ?? 0;
   return {
     id: crypto.randomUUID(),
     categoryId: "cat-legal",
@@ -22,12 +24,15 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     title: "Test task",
     status: "BACKLOG",
     priority: 2,
-    estimateMinutes: 30,
-    actualSecondsTotal: 0,
+    estimateMinutes: est,
+    actualSecondsTotal: act,
+    timeTrackingMode: "PROJECT",
     contextCard: { why: "", nextMicroStep: "", reframe: "" },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    subtasks: [],
+    subtasks: overrides.subtasks ?? [
+      { id: crypto.randomUUID(), title: "Main", done: false, estimateMinutes: est, actualSecondsTotal: act },
+    ],
     ...overrides,
   };
 }

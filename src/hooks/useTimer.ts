@@ -135,7 +135,7 @@ export function useTimer() {
       .single();
     if (taskRow) {
       const task = rowToTask(taskRow);
-      if (task.timeTrackingMode === "PROJECT" && state.subtaskId) {
+      if (state.subtaskId) {
         const updatedSubtasks = task.subtasks.map((subtask) =>
           subtask.id === state.subtaskId
             ? { ...subtask, actualSecondsTotal: (subtask.actualSecondsTotal ?? 0) + totalSeconds }

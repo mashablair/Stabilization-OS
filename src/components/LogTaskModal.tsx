@@ -61,6 +61,7 @@ export default function LogTaskModal({
     const taskId = generateId();
     const entryId = generateId();
 
+    const subtaskId = generateId();
     const task: Task = {
       id: taskId,
       categoryId: catId,
@@ -68,19 +69,23 @@ export default function LogTaskModal({
       title: title.trim(),
       status: "DONE",
       priority: 2,
+      timeTrackingMode: "PROJECT",
       estimateMinutes: durationMins,
       actualSecondsTotal: seconds,
       contextCard: { why: "", nextMicroStep: "", reframe: "" },
       createdAt: now,
       updatedAt: now,
       completedAt: endAt,
-      subtasks: [],
+      subtasks: [
+        { id: subtaskId, title: "Main", done: true, estimateMinutes: durationMins, actualSecondsTotal: seconds },
+      ],
     };
 
     await addTask(task);
     await addTimeEntry({
       id: entryId,
       taskId,
+      subtaskId,
       startAt,
       endAt,
       seconds,

@@ -413,28 +413,16 @@ export function getCategoriesByDomain(categories: Category[], domain: TaskDomain
   return categories.filter((c) => c.domain === domain);
 }
 
-export function isProjectMode(task: Task): boolean {
-  return task.timeTrackingMode === "PROJECT";
+export function isProjectMode(_task: Task): boolean {
+  return true;
 }
 
 export function getTaskEstimateMinutes(task: Task): number {
-  if (!isProjectMode(task)) return task.estimateMinutes ?? 0;
   return task.subtasks.reduce((sum, subtask) => sum + (subtask.estimateMinutes ?? 0), 0);
 }
 
 export function getTaskActualSeconds(task: Task): number {
-  if (!isProjectMode(task)) return task.actualSecondsTotal;
   return task.subtasks.reduce((sum, subtask) => sum + (subtask.actualSecondsTotal ?? 0), 0);
-}
-
-export function stripSubtaskTimeFields(
-  subtasks: Subtask[]
-): Array<{ id: string; title: string; done: boolean }> {
-  return subtasks.map((subtask) => ({
-    id: subtask.id,
-    title: subtask.title,
-    done: subtask.done,
-  }));
 }
 
 export async function getHiddenCategoryIds(): Promise<string[]> {
@@ -683,7 +671,7 @@ export async function addTask(task: Task): Promise<void> {
     pending_reason: task.pendingReason,
     context_card: task.contextCard,
     subtasks: task.subtasks,
-    time_tracking_mode: task.timeTrackingMode ?? "TASK",
+    time_tracking_mode: "PROJECT",
     created_at: task.createdAt,
     updated_at: task.updatedAt,
     completed_at: task.completedAt,

@@ -1,26 +1,21 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useTask, useCategories, useTimeEntriesForTask, rowToTask } from "../hooks/useData";
-import { supabase } from "../lib/supabase";
+import { useTask, useCategories, useTimeEntriesForTask } from "../hooks/useData";
 import {
   generateId,
   nowISO,
   markTaskDone,
   unmarkTaskDone,
   getCategoriesByDomain,
-  getTaskActualSeconds,
   getTaskEstimateMinutes,
-  isProjectMode,
-  stripSubtaskTimeFields,
   updateTask,
   addTimeEntry,
   deleteTimeEntry,
-  deleteTimeEntriesForTask,
   deleteTask as deleteTaskFn,
   type Task,
   type Subtask,
 } from "../db";
 import { useTimer, formatTime, formatMinutes } from "../hooks/useTimer";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const STATUS_OPTIONS = ["BACKLOG", "TODAY", "IN_PROGRESS", "PENDING", "DONE", "ARCHIVED"] as const;
 const PRIORITY_LABELS: Record<number, string> = {
@@ -93,10 +88,7 @@ export default function TaskDetailPage() {
   const [estimateMinutesDraft, setEstimateMinutesDraft] = useState("");
   const [moneyImpactDraft, setMoneyImpactDraft] = useState("");
   const [subtaskEstimateDrafts, setSubtaskEstimateDrafts] = useState<Record<string, string>>({});
-  const [projectModeNotice, setProjectModeNotice] = useState<
-    { variant: "captured" | "switched"; estimate: string; actual: string } | null
-  >(null);
-  const [modeSwitchConfirm, setModeSwitchConfirm] = useState<"toProject" | "toTask" | null>(null);
+  const migratedTaskId = useRef<string | null>(null);
 
   useEffect(() => {
     setIsEditingTitle(false);
@@ -109,8 +101,6 @@ export default function TaskDetailPage() {
     setEstimateMinutesDraft("");
     setMoneyImpactDraft("");
     setSubtaskEstimateDrafts({});
-    setProjectModeNotice(null);
-    setModeSwitchConfirm(null);
   }, [id]);
 
   useEffect(() => {
@@ -140,7 +130,7 @@ export default function TaskDetailPage() {
   const categories = getCategoriesByDomain(allCategories, task?.domain ?? "LIFE_ADMIN");
 
   useEffect(() => {
-    if (!task || !isProjectMode(task)) return;
+    if (!task) return;
     const currentSelectedExists = task.subtasks.some((subtask) => subtask.id === selectedSubtaskId);
     if (timer.activeSubtaskId && task.subtasks.some((subtask) => subtask.id === timer.activeSubtaskId)) {
       if (selectedSubtaskId !== timer.activeSubtaskId) {
@@ -153,6 +143,31 @@ export default function TaskDetailPage() {
     }
   }, [task, selectedSubtaskId, timer.activeSubtaskId]);
 
+  useEffect(() => {
+    if (!task || migratedTaskId.current === task.id) return;
+    if (task.subtasks.length > 0 && task.timeTrackingMode === "PROJECT") return;
+    migratedTaskId.current = task.id;
+    const updates: Partial<Task> = { timeTrackingMode: "PROJECT" };
+    if (task.subtasks.length === 0) {
+      const mainSub: Subtask = {
+        id: generateId(),
+        title: "Main",
+        done: task.status === "DONE",
+        estimateMinutes: task.estimateMinutes,
+        actualSecondsTotal: task.actualSecondsTotal,
+      };
+      updates.subtasks = [mainSub];
+    } else {
+      updates.subtasks = task.subtasks.map((s) => ({
+        ...s,
+        actualSecondsTotal: s.actualSecondsTotal ?? 0,
+      }));
+      updates.estimateMinutes = updates.subtasks.reduce((sum, s) => sum + (s.estimateMinutes ?? 0), 0);
+      updates.actualSecondsTotal = updates.subtasks.reduce((sum, s) => sum + (s.actualSecondsTotal ?? 0), 0);
+    }
+    updateTask(task.id, { ...updates, updatedAt: nowISO() });
+  }, [task]);
+
   if (!task) {
     return (
       <div className="flex justify-center items-center py-20 text-slate-400">
@@ -162,19 +177,12 @@ export default function TaskDetailPage() {
   }
 
   const cat = allCategories.find((c) => c.id === task.categoryId);
-  const isProjectTask = isProjectMode(task);
-  const canEnableProjectMode = task.subtasks.length > 0;
   const totalEstimateMinutes = getTaskEstimateMinutes(task);
-  const totalActualSeconds = getTaskActualSeconds(task);
-  const activeSubtask = isProjectTask
-    ? task.subtasks.find((subtask) => subtask.id === timer.activeSubtaskId)
-    : undefined;
-  const selectedSubtask = isProjectTask
-    ? task.subtasks.find((subtask) => subtask.id === selectedSubtaskId)
-    : undefined;
-  const focusSubtask = isProjectTask ? activeSubtask ?? selectedSubtask ?? task.subtasks[0] : undefined;
+  const activeSubtask = task.subtasks.find((subtask) => subtask.id === timer.activeSubtaskId);
+  const selectedSubtask = task.subtasks.find((subtask) => subtask.id === selectedSubtaskId);
+  const focusSubtask = activeSubtask ?? selectedSubtask ?? task.subtasks[0];
   const isActive = timer.activeTaskId === task.id;
-  const isFocusedTimer = isActive && (!isProjectTask || timer.activeSubtaskId === focusSubtask?.id);
+  const isFocusedTimer = isActive && timer.activeSubtaskId === focusSubtask?.id;
   const isRunning = isFocusedTimer && timer.isRunning;
   const isPaused = isFocusedTimer && timer.isPaused;
   const hasUnsavedChanges = dirtyFields.size > 0;
@@ -224,9 +232,7 @@ export default function TaskDetailPage() {
       if (field === "moneyImpact") updates.moneyImpact = parseOptionalNumber(moneyImpactDraft);
       if (field === "subtasks") {
         updates.subtasks = task.subtasks;
-        if (isProjectTask) {
-          updates.estimateMinutes = sumSubtaskEstimate(task.subtasks);
-        }
+        updates.estimateMinutes = sumSubtaskEstimate(task.subtasks);
       }
     }
     return updates;
@@ -264,14 +270,15 @@ export default function TaskDetailPage() {
         id: generateId(),
         title: newSubtask.trim(),
         done: false,
-        ...(isProjectTask ? { estimateMinutes: undefined, actualSecondsTotal: 0 } : {}),
+        estimateMinutes: undefined,
+        actualSecondsTotal: 0,
       },
     ];
-    const updates: Partial<typeof task> = { subtasks: updated };
-    if (isProjectTask) {
-      updates.estimateMinutes = sumSubtaskEstimate(updated);
-      updates.actualSecondsTotal = sumSubtaskActual(updated);
-    }
+    const updates: Partial<typeof task> = {
+      subtasks: updated,
+      estimateMinutes: sumSubtaskEstimate(updated),
+      actualSecondsTotal: sumSubtaskActual(updated),
+    };
     setSubtaskEstimateDrafts(buildSubtaskEstimateDrafts(updated));
     await updateImmediate(updates);
     setSelectedSubtaskId(updated[updated.length - 1]?.id ?? null);
@@ -290,15 +297,16 @@ export default function TaskDetailPage() {
   };
 
   const removeSubtask = async (subId: string) => {
+    if (task.subtasks.length <= 1) return;
     if (timer.activeTaskId === task.id && timer.activeSubtaskId === subId) {
       await timer.stopTimer();
     }
     const updated = task.subtasks.filter((subtask) => subtask.id !== subId);
-    const updates: Partial<typeof task> = { subtasks: updated };
-    if (isProjectTask) {
-      updates.estimateMinutes = sumSubtaskEstimate(updated);
-      updates.actualSecondsTotal = sumSubtaskActual(updated);
-    }
+    const updates: Partial<typeof task> = {
+      subtasks: updated,
+      estimateMinutes: sumSubtaskEstimate(updated),
+      actualSecondsTotal: sumSubtaskActual(updated),
+    };
     setSubtaskEstimateDrafts(buildSubtaskEstimateDrafts(updated));
     await updateImmediate(updates);
     if (selectedSubtaskId === subId) {
@@ -333,70 +341,6 @@ export default function TaskDetailPage() {
     await commitDraftFields("subtasks");
   };
 
-  const switchToProjectMode = async () => {
-    if (isProjectTask) return;
-    if (!canEnableProjectMode) return;
-    if (timer.activeTaskId === task.id) {
-      await timer.stopTimer();
-    }
-
-    const capturedEstimate = formatMinutes(task.estimateMinutes ?? 0);
-    const capturedActual = formatMinutes(Math.round(task.actualSecondsTotal / 60));
-    await deleteTimeEntriesForTask(task.id);
-
-    const updatedSubtasks = task.subtasks.map((subtask) => ({
-      ...subtask,
-      actualSecondsTotal: subtask.actualSecondsTotal ?? 0,
-      estimateMinutes: subtask.estimateMinutes ?? undefined,
-    }));
-    await updateImmediate({
-      timeTrackingMode: "PROJECT",
-      subtasks: updatedSubtasks,
-      estimateMinutes: sumSubtaskEstimate(updatedSubtasks),
-      actualSecondsTotal: sumSubtaskActual(updatedSubtasks),
-    });
-    setSelectedSubtaskId(updatedSubtasks[0]?.id ?? null);
-    setModeSwitchConfirm(null);
-    setProjectModeNotice({
-      variant: "captured",
-      estimate: capturedEstimate,
-      actual: capturedActual,
-    });
-  };
-
-  const switchToTaskMode = async () => {
-    if (!isProjectTask) return;
-    if (timer.activeTaskId === task.id) {
-      await timer.stopTimer();
-    }
-    const { data: freshRow } = await supabase.from("tasks").select("*").eq("id", task.id).single();
-    if (!freshRow) return;
-    const freshTask = rowToTask(freshRow);
-    let totalEstimate = sumSubtaskEstimate(freshTask.subtasks);
-    let totalActual = sumSubtaskActual(freshTask.subtasks);
-    if (totalActual === 0 && timeEntries.length > 0) {
-      totalActual = timeEntries
-        .filter((e) => e.endAt)
-        .reduce((sum, e) => sum + e.seconds, 0);
-    }
-    if (totalEstimate === 0 && (freshTask.estimateMinutes ?? 0) > 0) {
-      totalEstimate = freshTask.estimateMinutes!;
-    }
-    await deleteTimeEntriesForTask(task.id);
-    await updateImmediate({
-      timeTrackingMode: "TASK",
-      estimateMinutes: totalEstimate || undefined,
-      actualSecondsTotal: totalActual,
-      subtasks: stripSubtaskTimeFields(freshTask.subtasks),
-    });
-    setModeSwitchConfirm(null);
-    setProjectModeNotice({
-      variant: "switched",
-      estimate: formatMinutes(totalEstimate),
-      actual: formatMinutes(Math.round(totalActual / 60)),
-    });
-  };
-
   const handleDeleteTask = async () => {
     if (!confirm("Delete this task permanently?")) return;
     if (timer.activeTaskId === task.id) {
@@ -407,7 +351,7 @@ export default function TaskDetailPage() {
   };
 
   const completedEntries = timeEntries
-    .filter((entry) => !isProjectTask || entry.subtaskId === focusSubtask?.id)
+    .filter((entry) => entry.subtaskId === focusSubtask?.id)
     .filter((e) => e.endAt)
     .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
 
@@ -429,7 +373,7 @@ export default function TaskDetailPage() {
   const addManualTime = async () => {
     const minutes = parseAddTimeInput(addTimeInput);
     if (minutes == null || minutes <= 0) return;
-    if (isProjectTask && !focusSubtask) return;
+    if (!focusSubtask) return;
     const seconds = minutes * 60;
     const now = nowISO();
     const startAt = new Date(Date.now() - seconds * 1000).toISOString();
@@ -437,34 +381,27 @@ export default function TaskDetailPage() {
     await addTimeEntry({
       id: entryId,
       taskId: task.id,
-      ...(isProjectTask ? { subtaskId: focusSubtask?.id } : {}),
+      subtaskId: focusSubtask.id,
       startAt,
       endAt: now,
       seconds,
     });
-    if (isProjectTask && focusSubtask) {
-      const updatedSubtasks = task.subtasks.map((subtask) =>
-        subtask.id === focusSubtask.id
-          ? { ...subtask, actualSecondsTotal: (subtask.actualSecondsTotal ?? 0) + seconds }
-          : subtask
-      );
-      await updateTask(task.id, {
-        subtasks: updatedSubtasks,
-        actualSecondsTotal: sumSubtaskActual(updatedSubtasks),
-        updatedAt: now,
-      });
-    } else {
-      await updateTask(task.id, {
-        actualSecondsTotal: task.actualSecondsTotal + seconds,
-        updatedAt: now,
-      });
-    }
+    const updatedSubtasks = task.subtasks.map((subtask) =>
+      subtask.id === focusSubtask.id
+        ? { ...subtask, actualSecondsTotal: (subtask.actualSecondsTotal ?? 0) + seconds }
+        : subtask
+    );
+    await updateTask(task.id, {
+      subtasks: updatedSubtasks,
+      actualSecondsTotal: sumSubtaskActual(updatedSubtasks),
+      updatedAt: now,
+    });
     setAddTimeInput("");
   };
 
   const removeSession = async (entry: (typeof completedEntries)[0]) => {
     await deleteTimeEntry(entry.id);
-    if (isProjectTask && entry.subtaskId) {
+    if (entry.subtaskId) {
       const updatedSubtasks = task.subtasks.map((subtask) =>
         subtask.id === entry.subtaskId
           ? {
@@ -719,61 +656,59 @@ export default function TaskDetailPage() {
                       {sub.title || <span className="text-slate-400 italic">Click to edit</span>}
                     </button>
                   )}
-                  {isProjectTask && (
-                    <>
-                      <div className="w-[86px] shrink-0">
-                        <input
-                          type="number"
-                          min={0}
-                          value={subtaskEstimateDrafts[sub.id] ?? ""}
-                          onChange={(e) => updateSubtaskEstimateDraft(sub.id, e.target.value)}
-                          onBlur={commitSubtaskEstimates}
-                          className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-2 py-1.5 text-xs font-semibold text-right focus:ring-2 focus:ring-primary"
-                          placeholder="min"
-                          title="Subtask estimate in minutes"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedSubtaskId(sub.id);
-                          if (timer.activeTaskId === task.id && timer.activeSubtaskId === sub.id) {
-                            if (timer.isRunning) {
-                              timer.pauseTimer();
-                            } else {
-                              timer.startTimer(task.id, sub.id);
-                            }
-                            return;
-                          }
-                          timer.startTimer(task.id, sub.id);
-                        }}
-                        className={`size-8 rounded-lg flex items-center justify-center border transition-colors ${
-                          timer.activeTaskId === task.id && timer.activeSubtaskId === sub.id
-                            ? "border-primary text-primary"
-                            : "border-slate-200 dark:border-slate-700 text-slate-400 hover:text-primary hover:border-primary/50"
-                        }`}
-                        title={
-                          timer.activeTaskId === task.id && timer.activeSubtaskId === sub.id && timer.isRunning
-                            ? "Pause subtask timer"
-                            : "Start subtask timer"
-                        }
-                      >
-                        <span className="material-symbols-outlined text-base">
-                          {timer.activeTaskId === task.id &&
-                          timer.activeSubtaskId === sub.id &&
-                          timer.isRunning
-                            ? "pause"
-                            : "play_arrow"}
-                        </span>
-                      </button>
-                    </>
-                  )}
+                  <div className="w-[86px] shrink-0">
+                    <input
+                      type="number"
+                      min={0}
+                      value={subtaskEstimateDrafts[sub.id] ?? ""}
+                      onChange={(e) => updateSubtaskEstimateDraft(sub.id, e.target.value)}
+                      onBlur={commitSubtaskEstimates}
+                      className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-2 py-1.5 text-xs font-semibold text-right focus:ring-2 focus:ring-primary"
+                      placeholder="min"
+                      title="Subtask estimate in minutes"
+                    />
+                  </div>
                   <button
-                    onClick={() => removeSubtask(sub.id)}
-                    className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-opacity"
+                    type="button"
+                    onClick={() => {
+                      setSelectedSubtaskId(sub.id);
+                      if (timer.activeTaskId === task.id && timer.activeSubtaskId === sub.id) {
+                        if (timer.isRunning) {
+                          timer.pauseTimer();
+                        } else {
+                          timer.startTimer(task.id, sub.id);
+                        }
+                        return;
+                      }
+                      timer.startTimer(task.id, sub.id);
+                    }}
+                    className={`size-8 rounded-lg flex items-center justify-center border transition-colors ${
+                      timer.activeTaskId === task.id && timer.activeSubtaskId === sub.id
+                        ? "border-primary text-primary"
+                        : "border-slate-200 dark:border-slate-700 text-slate-400 hover:text-primary hover:border-primary/50"
+                    }`}
+                    title={
+                      timer.activeTaskId === task.id && timer.activeSubtaskId === sub.id && timer.isRunning
+                        ? "Pause subtask timer"
+                        : "Start subtask timer"
+                    }
                   >
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                    <span className="material-symbols-outlined text-base">
+                      {timer.activeTaskId === task.id &&
+                      timer.activeSubtaskId === sub.id &&
+                      timer.isRunning
+                        ? "pause"
+                        : "play_arrow"}
+                    </span>
                   </button>
+                  {task.subtasks.length > 1 && (
+                    <button
+                      onClick={() => removeSubtask(sub.id)}
+                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-opacity"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                  )}
                 </div>
               ))}
               <div className="flex items-center gap-2 p-3">
@@ -876,29 +811,10 @@ export default function TaskDetailPage() {
           ) : (
             /* Focus Timer — shown for all non-PENDING statuses */
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-8 flex flex-col items-center gap-4">
-              {projectModeNotice && (
-                <div className="w-full rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 flex items-center justify-between gap-2">
-                  <span>
-                    {projectModeNotice.variant === "captured" ? (
-                      <>Captured before switch: estimate <strong>{projectModeNotice.estimate}</strong>, actual <strong>{projectModeNotice.actual}</strong>. You can now estimate and track time per subtask.</>
-                    ) : (
-                      <>Switched to regular mode. Totals applied: estimate <strong>{projectModeNotice.estimate}</strong>, actual <strong>{projectModeNotice.actual}</strong>.</>
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setProjectModeNotice(null)}
-                    className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                    title="Dismiss"
-                  >
-                    <span className="material-symbols-outlined text-sm">close</span>
-                  </button>
-                </div>
-              )}
               <div className="text-slate-400 text-xs font-bold uppercase tracking-widest">
-                {isProjectTask ? `Subtask Timer` : "Timer"}
+                Subtask Timer
               </div>
-              {(isProjectTask && focusSubtask?.title) ? (
+              {focusSubtask?.title ? (
                 <div className="text-slate-500 dark:text-slate-400 text-xs font-medium">
                   {focusSubtask.title}
                 </div>
@@ -906,7 +822,7 @@ export default function TaskDetailPage() {
               <div className="text-5xl font-black font-mono tabular-nums tracking-tighter">
                 {isFocusedTimer
                   ? formatTime(timer.elapsed)
-                  : formatTime(isProjectTask ? focusSubtask?.actualSecondsTotal ?? 0 : totalActualSeconds)}
+                  : formatTime(focusSubtask?.actualSecondsTotal ?? 0)}
               </div>
               <div className="flex gap-3 w-full mt-2">
                 {isRunning ? (
@@ -944,7 +860,7 @@ export default function TaskDetailPage() {
                 ) : (
                   <button
                     onClick={() => timer.startTimer(task.id, focusSubtask?.id)}
-                    disabled={isProjectTask && !focusSubtask}
+                    disabled={!focusSubtask}
                     className="flex-1 bg-gradient-accent text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-primary/20"
                   >
                     <span className="material-symbols-outlined">play_arrow</span>
@@ -967,7 +883,7 @@ export default function TaskDetailPage() {
                 <button
                   type="button"
                   onClick={addManualTime}
-                  disabled={!parseAddTimeInput(addTimeInput) || (isProjectTask && !focusSubtask)}
+                  disabled={!parseAddTimeInput(addTimeInput) || !focusSubtask}
                   className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Add
@@ -979,7 +895,7 @@ export default function TaskDetailPage() {
                   <div className="flex justify-between items-center text-xs mb-3">
                     <span className="text-slate-500 font-medium">Session History</span>
                     <span className="font-bold text-gradient">
-                      Total: {formatMinutes(Math.round((isProjectTask ? focusSubtask?.actualSecondsTotal ?? 0 : totalActualSeconds) / 60))}
+                      Total: {formatMinutes(Math.round((focusSubtask?.actualSecondsTotal ?? 0) / 60))}
                     </span>
                   </div>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
@@ -1008,67 +924,17 @@ export default function TaskDetailPage() {
 
           {/* Fields */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-5">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  Time Tracking Mode
-                </label>
-                <span
-                  className="material-symbols-outlined text-slate-400 text-base"
-                  title="Project Mode tracks and estimates time separately for each subtask."
-                >
-                  info
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => isProjectTask && setModeSwitchConfirm("toTask")}
-                  className={`flex-1 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${
-                    !isProjectTask
-                      ? "bg-primary/10 text-primary border-primary"
-                      : "border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-400"
-                  }`}
-                >
-                  Regular Task Mode
-                </button>
-                <button
-                  type="button"
-                  onClick={() => !isProjectTask && canEnableProjectMode && setModeSwitchConfirm("toProject")}
-                  disabled={!canEnableProjectMode}
-                  className={`flex-1 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${
-                    isProjectTask
-                      ? "bg-primary/10 text-primary border-primary"
-                      : "border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-400"
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  Project Mode
-                </button>
-              </div>
-              {!canEnableProjectMode && !isProjectTask && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  Add at least one subtask to enable Project Mode.
-                </p>
-              )}
-            </div>
-
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-                {isProjectTask ? "Total Time Estimate (sum of subtasks)" : "Time Estimate (min)"}
+                Total Time Estimate (sum of subtasks)
               </label>
-              <div className="bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center px-4 h-12 border border-transparent focus-within:border-primary transition-all">
+              <div className="bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center px-4 h-12 border border-transparent transition-all">
                 <span className="material-symbols-outlined text-slate-400 text-sm">timer</span>
                 <input
                   className="bg-transparent border-none focus:ring-0 text-sm font-bold w-full focus:outline-none pl-2.5"
                   type="number"
-                  value={isProjectTask ? totalEstimateMinutes : estimateMinutesDraft}
-                  onChange={(e) => {
-                    setEstimateMinutesDraft(e.target.value);
-                    setLocalTaskFields({ estimateMinutes: parseOptionalNumber(e.target.value) });
-                    markDirty("estimateMinutes");
-                  }}
-                  onBlur={() => commitDraftFields("estimateMinutes")}
-                  disabled={isProjectTask}
+                  value={totalEstimateMinutes}
+                  disabled
                   min={0}
                 />
                 <span className="text-xs text-slate-500">min</span>
@@ -1180,78 +1046,6 @@ export default function TaskDetailPage() {
         </div>
       </div>
 
-      {modeSwitchConfirm && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <div className="p-6 flex flex-col gap-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold tracking-tight">
-                  Switch to {modeSwitchConfirm === "toProject" ? "Project" : "Regular Task"} Mode?
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setModeSwitchConfirm(null)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                >
-                  <span className="material-symbols-outlined">close</span>
-                </button>
-              </div>
-
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                Session history (individual time entries) will be cleared. Your totals will be preserved as the following:
-              </p>
-
-              <div className="rounded-xl bg-slate-100 dark:bg-slate-800 px-4 py-3 text-sm">
-                {modeSwitchConfirm === "toProject" ? (
-                  <>
-                    <span className="text-slate-600 dark:text-slate-400">Current totals: </span>
-                    <strong>estimate {formatMinutes(task.estimateMinutes ?? 0)}</strong>
-                    <span className="text-slate-600 dark:text-slate-400">, </span>
-                    <strong>actual {formatMinutes(Math.round(task.actualSecondsTotal / 60))}</strong>
-                  </>
-                ) : (
-                  (() => {
-                    const freshTask = task;
-                    let est = sumSubtaskEstimate(freshTask.subtasks);
-                    let act = sumSubtaskActual(freshTask.subtasks);
-                    if (act === 0 && timeEntries.length > 0) {
-                      act = timeEntries.filter((e) => e.endAt).reduce((s, e) => s + e.seconds, 0);
-                    }
-                    if (est === 0 && (freshTask.estimateMinutes ?? 0) > 0) {
-                      est = freshTask.estimateMinutes!;
-                    }
-                    return (
-                      <>
-                        <span className="text-slate-600 dark:text-slate-400">Totals to apply: </span>
-                        <strong>estimate {formatMinutes(est)}</strong>
-                        <span className="text-slate-600 dark:text-slate-400">, </span>
-                        <strong>actual {formatMinutes(Math.round(act / 60))}</strong>
-                      </>
-                    );
-                  })()
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setModeSwitchConfirm(null)}
-                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => (modeSwitchConfirm === "toProject" ? switchToProjectMode() : switchToTaskMode())}
-                  className="flex-1 bg-gradient-accent text-white font-bold py-3 rounded-xl shadow-lg shadow-primary/20 hover:opacity-90 transition-all"
-                >
-                  Switch
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

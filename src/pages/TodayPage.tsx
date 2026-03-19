@@ -14,7 +14,6 @@ import {
   todayDateStr,
   getTaskActualSeconds,
   getTaskEstimateMinutes,
-  isProjectMode,
   updateTask,
 } from "../db";
 import type { TaskDomain } from "../db";
@@ -156,7 +155,6 @@ export default function TodayPage() {
   const closeCpPopoverOnTabSwitch = () => setCapacityPopoverOpen(false);
   const catMap = new Map(categories.map((c) => [c.id, c]));
   const getSelectedProjectSubtask = (task: (typeof allTasks)[0]) => {
-    if (!isProjectMode(task)) return undefined;
     if (timer.activeTaskId === task.id && timer.activeSubtaskId) {
       return task.subtasks.find((subtask) => subtask.id === timer.activeSubtaskId);
     }
@@ -196,7 +194,6 @@ export default function TodayPage() {
     showPinActions = true
   ) => {
     const cat = catMap.get(task.categoryId);
-    const projectTask = isProjectMode(task);
     const selectedProjectSubtask = getSelectedProjectSubtask(task);
     const isActive = timer.activeTaskId === task.id;
     const isRunning = isActive && timer.isRunning;
@@ -282,7 +279,7 @@ export default function TodayPage() {
           <div className="mb-4 flex items-center gap-2 text-xs text-slate-400">
             <span className="material-symbols-outlined text-sm">checklist</span>
             {task.subtasks.filter((s) => s.done).length}/{task.subtasks.length} subtasks
-            {projectTask && selectedProjectSubtask && (
+            {selectedProjectSubtask && (
               <span className="ml-2 text-primary truncate">Tracking: {selectedProjectSubtask.title}</span>
             )}
           </div>
@@ -312,7 +309,7 @@ export default function TodayPage() {
                   onClick={() =>
                     timer.startTimer(
                       task.id,
-                      projectTask ? timer.activeSubtaskId ?? selectedProjectSubtask?.id : undefined
+                      timer.activeSubtaskId ?? selectedProjectSubtask?.id
                     )
                   }
                   className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
@@ -329,8 +326,8 @@ export default function TodayPage() {
               </>
             ) : (
               <button
-                onClick={() => timer.startTimer(task.id, projectTask ? selectedProjectSubtask?.id : undefined)}
-                disabled={projectTask && !selectedProjectSubtask}
+                onClick={() => timer.startTimer(task.id, selectedProjectSubtask?.id)}
+                disabled={!selectedProjectSubtask}
                 className="flex-1 border-2 border-primary text-primary hover:bg-gradient-accent hover:text-white hover:border-transparent font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined">play_arrow</span>
@@ -338,7 +335,7 @@ export default function TodayPage() {
               </button>
             )}
           </div>
-          {projectTask && task.subtasks.length > 1 && (
+          {task.subtasks.length > 1 && (
             <div className="flex flex-col items-start gap-1">
               <button
                 type="button"
