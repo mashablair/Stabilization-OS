@@ -63,6 +63,10 @@ npm test
 
 Tests use Vitest. `todayStack.test.ts` covers stack-building logic, actionable/waiting states, archived behaviour, and daily capacity overrides. `habits.test.ts` covers habit scheduling, consistency/streak metrics, and habit log behavior.
 
+## Design
+
+UI conventions, **compact / data-dense** defaults, color tokens, and dark mode live in **[design.md](./design.md)**. Tokens are defined in `src/index.css` (`@theme`).
+
 ## Tech Stack
 
 - Vite + React + TypeScript

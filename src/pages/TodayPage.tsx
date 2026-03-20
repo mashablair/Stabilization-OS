@@ -226,13 +226,13 @@ export default function TodayPage() {
     return (
       <div
         key={task.id}
-        className={`p-6 rounded-2xl transition-all ${
+        className={`p-4 rounded-xl transition-all ${
           isActive
-            ? "bg-white dark:bg-card-dark border-2 border-primary/40 shadow-[0_0_20px_rgba(168,85,247,0.15)] ring-4 ring-primary/5"
+            ? "bg-white dark:bg-card-dark border-2 border-primary/40 shadow-[0_0_20px_rgba(168,85,247,0.15)] ring-2 ring-primary/5"
             : "bg-white/60 dark:bg-card-dark/50 border border-slate-200 dark:border-border-dark opacity-80 hover:opacity-100"
         }`}
       >
-        <div className="flex justify-between items-start mb-3">
+        <div className="flex justify-between items-start mb-2">
           <span
             className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${
               isActive
@@ -272,7 +272,7 @@ export default function TodayPage() {
               </button>
             )}
             {isActive ? (
-              <span className="text-gradient font-mono font-bold text-lg">
+              <span className="text-gradient font-mono font-bold text-base">
                 {formatTime(timer.elapsed)}
                 {displayEstimate ? ` / ${formatTime(displayEstimate * 60)}` : ""}
               </span>
@@ -286,20 +286,20 @@ export default function TodayPage() {
 
         <Link to={`/tasks/${task.id}`}>
           <h4
-            className={`${isActive ? "text-xl font-bold" : "text-lg font-semibold"} mb-1 hover:text-primary transition-colors`}
+            className={`${isActive ? "text-lg font-bold" : "text-base font-semibold"} mb-0.5 hover:text-primary transition-colors`}
           >
             {task.title}
           </h4>
         </Link>
 
         {task.contextCard.reframe && (
-          <p className="text-slate-500 dark:text-slate-400 text-sm italic mb-4">
+          <p className="text-slate-500 dark:text-slate-400 text-sm italic mb-2">
             "{task.contextCard.reframe}"
           </p>
         )}
 
         {task.subtasks.length > 0 && (
-          <div className="mb-4 flex items-center gap-2 text-xs text-slate-400">
+          <div className="mb-2 flex items-center gap-2 text-xs text-slate-400">
             <span className="material-symbols-outlined text-sm">checklist</span>
             {task.subtasks.filter((s) => s.done).length}/{task.subtasks.length} subtasks
             {selectedProjectSubtask && (
@@ -314,14 +314,14 @@ export default function TodayPage() {
               <>
                 <button
                   onClick={() => timer.pauseTimer()}
-                  className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+                  className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
                 >
                   <span className="material-symbols-outlined">pause</span>
                   Pause
                 </button>
                 <button
                   onClick={() => timer.stopTimer()}
-                  className="size-12 flex items-center justify-center border-2 border-slate-200 dark:border-border-dark rounded-xl text-slate-400 hover:text-red-500 hover:border-red-500/50 transition-all"
+                  className="size-10 flex items-center justify-center border-2 border-slate-200 dark:border-border-dark rounded-lg text-slate-400 hover:text-red-500 hover:border-red-500/50 transition-all"
                 >
                   <span className="material-symbols-outlined">stop</span>
                 </button>
@@ -335,14 +335,14 @@ export default function TodayPage() {
                       timer.activeSubtaskId ?? selectedProjectSubtask?.id
                     )
                   }
-                  className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+                  className="flex-1 bg-gradient-accent hover:opacity-90 text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
                 >
                   <span className="material-symbols-outlined">play_arrow</span>
                   Resume
                 </button>
                 <button
                   onClick={() => timer.stopTimer()}
-                  className="size-12 flex items-center justify-center border-2 border-slate-200 dark:border-border-dark rounded-xl text-slate-400 hover:text-red-500 hover:border-red-500/50 transition-all"
+                  className="size-10 flex items-center justify-center border-2 border-slate-200 dark:border-border-dark rounded-lg text-slate-400 hover:text-red-500 hover:border-red-500/50 transition-all"
                 >
                   <span className="material-symbols-outlined">stop</span>
                 </button>
@@ -351,7 +351,7 @@ export default function TodayPage() {
               <button
                 onClick={() => timer.startTimer(task.id, selectedProjectSubtask?.id)}
                 disabled={!selectedProjectSubtask}
-                className="flex-1 border-2 border-primary text-primary hover:bg-gradient-accent hover:text-white hover:border-transparent font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 border-2 border-primary text-primary hover:bg-gradient-accent hover:text-white hover:border-transparent font-bold py-2 rounded-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined">play_arrow</span>
                 Start
@@ -398,16 +398,16 @@ export default function TodayPage() {
   };
 
   return (
-    <div className="flex flex-1 justify-center py-8 px-4 nav:px-0 pb-24 md:pb-8">
-      <div className="flex flex-col max-w-[800px] flex-1 gap-8">
+    <div className="flex flex-1 justify-center py-5 px-4 nav:px-0 pb-24 md:pb-8">
+      <div className="flex flex-col max-w-[800px] flex-1 gap-5">
         {/* Tab Selector */}
-        <section className="flex flex-col gap-5 text-center">
+        <section className="flex flex-col gap-3 text-center">
           <div className="flex items-center justify-center gap-2 text-primary">
-            <span className="material-symbols-outlined text-3xl">
+            <span className="material-symbols-outlined text-2xl">
               {tab === "Life" ? "shield" : "construction"}
             </span>
           </div>
-          <h1 className="tracking-tight text-3xl font-bold leading-tight">
+          <h1 className="tracking-tight text-2xl font-bold leading-tight">
             {tab === "Life"
               ? "What needs balancing today?"
               : "What are you building today?"}
@@ -417,13 +417,13 @@ export default function TodayPage() {
               ? "Focus on the foundations. Legal and financial tasks come first."
               : "Business tasks live here. Ship when you're ready."}
           </p>
-          <div className="flex p-1.5 rounded-xl bg-slate-200 dark:bg-card-dark border border-slate-300 dark:border-border-dark self-center w-full max-w-sm">
+          <div className="flex p-1 rounded-xl bg-slate-200 dark:bg-card-dark border border-slate-300 dark:border-border-dark self-center w-full max-w-sm">
             {(["Life", "Builder"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => { setTab(t); setWaitingOpen(false); closeCpPopoverOnTabSwitch(); }}
-                className={`flex cursor-pointer h-12 flex-1 items-center justify-center overflow-hidden rounded-lg px-4 transition-all text-sm font-semibold ${
+                className={`flex cursor-pointer h-10 flex-1 items-center justify-center overflow-hidden rounded-lg px-3 transition-all text-sm font-semibold ${
                   tab === t
                     ? "bg-gradient-accent text-white shadow-lg shadow-primary/20"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
@@ -437,14 +437,14 @@ export default function TodayPage() {
 
         {/* Capacity */}
         {(tab === "Life" || (tab === "Builder" && builderActionable.length > 0)) && (
-          <section className="flex flex-col items-center gap-4 bg-primary/5 p-6 rounded-2xl border border-primary/10 mb-[25px]">
-            <div className="flex flex-col items-center gap-2">
-              <h3 className="text-slate-700 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">
+          <section className="flex flex-col items-center gap-3 bg-primary/5 p-4 rounded-xl border border-primary/10 mb-4">
+            <div className="flex flex-col items-center gap-1.5">
+              <h3 className="text-slate-700 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
                 Time Capacity
               </h3>
-              <div className="relative flex items-center gap-3">
-                <span className="text-5xl font-bold text-gradient">{availMins}</span>
-                <span className="text-2xl font-medium text-slate-400">minutes</span>
+              <div className="relative flex items-center gap-2">
+                <span className="text-4xl font-bold text-gradient">{availMins}</span>
+                <span className="text-lg font-medium text-slate-400">minutes</span>
                 <button
                   type="button"
                   onClick={() => setCapacityPopoverOpen(!capacityPopoverOpen)}
@@ -517,19 +517,19 @@ export default function TodayPage() {
         )}
 
         {/* Today Stack */}
-        <section className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold leading-tight flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">layers</span>
+              <h3 className="text-lg font-bold leading-tight flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[22px]">layers</span>
                 {tab === "Life" ? "Today Stack" : "Builder Queue"}
                 {tab === "Life" && (
-                  <span className="hidden md:inline text-slate-400 font-normal text-base">
+                  <span className="hidden md:inline text-slate-400 font-normal text-sm">
                     ({stackCount}/5)
                   </span>
                 )}
               </h3>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <div className="relative group">
                   <Link
                     to="/habits"
@@ -596,17 +596,17 @@ export default function TodayPage() {
 
           {/* Builder empty state */}
           {tab === "Builder" && builderActionable.length === 0 && (
-            <div className="text-center py-16 px-6">
-              <div className="inline-flex items-center justify-center size-16 rounded-2xl bg-slate-100 dark:bg-card-dark mb-5">
-                <span className="material-symbols-outlined text-3xl text-slate-400">pause_circle</span>
+            <div className="text-center py-10 px-4">
+              <div className="inline-flex items-center justify-center size-14 rounded-xl bg-slate-100 dark:bg-card-dark mb-3">
+                <span className="material-symbols-outlined text-2xl text-slate-400">pause_circle</span>
               </div>
-              <h3 className="text-xl font-bold mb-2">Builder is paused</h3>
+              <h3 className="text-lg font-bold mb-1.5">Builder is paused</h3>
               <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm mx-auto leading-relaxed">
                 This week is Balance week. Add business tasks when you're ready — they'll live here.
               </p>
               <button
                 onClick={() => setShowModal(true)}
-                className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-accent text-white font-bold text-sm shadow-lg shadow-primary/20 hover:opacity-90 transition-all"
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-accent text-white font-bold text-sm shadow-lg shadow-primary/20 hover:opacity-90 transition-all"
               >
                 <span className="material-symbols-outlined text-sm">add</span>
                 Add Business Task
@@ -616,7 +616,7 @@ export default function TodayPage() {
 
           {/* Stack full message (Life) */}
           {stackFull && (
-            <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+            <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
               Stack full (5/5). Remove a task from today to add another, or use{" "}
               <button
                 onClick={() => setShowAllTasksDrawer(true)}
@@ -630,8 +630,8 @@ export default function TodayPage() {
 
           {/* Life empty state */}
           {tab === "Life" && stabilizerTasks.length === 0 && (
-            <div className="text-center py-12 text-slate-400">
-              <span className="material-symbols-outlined text-4xl mb-2 block">check_circle</span>
+            <div className="text-center py-8 text-slate-400">
+              <span className="material-symbols-outlined text-3xl mb-1.5 block">check_circle</span>
               <p className="font-medium">All clear.</p>
               <p className="text-sm mt-1">No life-admin tasks need attention right now.</p>
               <p className="text-sm mt-2">
@@ -647,31 +647,31 @@ export default function TodayPage() {
           )}
 
           {/* Task cards */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4">
             {tab === "Life" && stabilizerPinned.length > 0 && (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                 <h4 className="text-xs font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 flex items-center gap-2">
                   <span className="material-symbols-outlined text-sm">push_pin</span>
                   Pinned
                 </h4>
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3">
                   {stabilizerPinned.map((task) => renderTaskCard(task, true))}
                 </div>
               </div>
             )}
             {tab === "Life" && stabilizerSuggested.length > 0 && (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                 <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-2">
                   <span className="material-symbols-outlined text-sm">auto_awesome</span>
                   Suggested
                 </h4>
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3">
                   {stabilizerSuggested.map((task) => renderTaskCard(task, false))}
                 </div>
               </div>
             )}
             {tab === "Builder" && (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
                 {builderActionable.map((task) =>
                   renderTaskCard(task, task.status === "TODAY", false)
                 )}
@@ -686,13 +686,13 @@ export default function TodayPage() {
             <button
               type="button"
               onClick={() => setDoneOpen(!doneOpen)}
-              className="flex items-center gap-3 py-3 text-left group"
+              className="flex items-center gap-2 py-2 text-left group"
             >
               <span className={`material-symbols-outlined text-slate-400 transition-transform ${doneOpen ? "rotate-90" : ""}`}>
                 chevron_right
               </span>
-              <h3 className="text-lg font-bold text-green-600 dark:text-green-400 group-hover:text-green-500 transition-colors flex items-center gap-2">
-                <span className="material-symbols-outlined text-xl">task_alt</span>
+              <h3 className="text-base font-bold text-green-600 dark:text-green-400 group-hover:text-green-500 transition-colors flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg">task_alt</span>
                 Done Today
               </h3>
               <span className="px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold">
@@ -701,9 +701,9 @@ export default function TodayPage() {
             </button>
 
             {doneOpen && (
-              <div className="flex flex-col gap-3 mt-2">
-                <div className="bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-xl border border-green-200 dark:border-green-800/40 p-4 flex items-center gap-3">
-                  <span className="material-symbols-outlined text-2xl text-green-500">celebration</span>
+              <div className="flex flex-col gap-2 mt-1">
+                <div className="bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-lg border border-green-200 dark:border-green-800/40 p-3 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-xl text-green-500">celebration</span>
                   <p className="text-sm font-medium text-green-700 dark:text-green-300">
                     {doneToday.length === 1
                       ? "You knocked one out! Every step closed is a loop that stops draining your energy."
@@ -719,7 +719,7 @@ export default function TodayPage() {
                     return (
                       <div
                         key={item.task.id}
-                        className="bg-white/40 dark:bg-card-dark/30 border border-green-200/50 dark:border-green-800/20 rounded-xl p-4 flex items-center justify-between gap-4"
+                        className="bg-white/40 dark:bg-card-dark/30 border border-green-200/50 dark:border-green-800/20 rounded-lg p-3 flex items-center justify-between gap-3"
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <button
@@ -749,7 +749,7 @@ export default function TodayPage() {
                   return (
                     <div
                       key={`partial-${item.task.id}`}
-                      className="bg-white/40 dark:bg-card-dark/30 border border-green-200/50 dark:border-green-800/20 rounded-xl p-4"
+                      className="bg-white/40 dark:bg-card-dark/30 border border-green-200/50 dark:border-green-800/20 rounded-lg p-3"
                     >
                       <Link to={`/tasks/${item.task.id}`} className="hover:text-primary transition-colors">
                         <h4 className="font-semibold truncate text-sm">{item.task.title}</h4>
@@ -787,12 +787,12 @@ export default function TodayPage() {
             <button
               type="button"
               onClick={() => setWaitingOpen(!waitingOpen)}
-              className="flex items-center gap-3 py-3 text-left group"
+              className="flex items-center gap-2 py-2 text-left group"
             >
               <span className={`material-symbols-outlined text-slate-400 transition-transform ${waitingOpen ? "rotate-90" : ""}`}>
                 chevron_right
               </span>
-              <h3 className="text-lg font-bold text-slate-600 dark:text-slate-300 group-hover:text-primary transition-colors">
+              <h3 className="text-base font-bold text-slate-600 dark:text-slate-300 group-hover:text-primary transition-colors">
                 Waiting
               </h3>
               <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold">
@@ -801,13 +801,13 @@ export default function TodayPage() {
             </button>
 
             {waitingOpen && (
-              <div className="flex flex-col gap-3 mt-2">
+              <div className="flex flex-col gap-2 mt-1">
                 {waitingTasks.map((task) => {
                   const cat = catMap.get(task.categoryId);
                   return (
                     <div
                       key={task.id}
-                      className="bg-white/50 dark:bg-card-dark/30 border border-slate-200 dark:border-border-dark rounded-xl p-5 flex items-start justify-between gap-4"
+                      className="bg-white/50 dark:bg-card-dark/30 border border-slate-200 dark:border-border-dark rounded-lg p-3 flex items-start justify-between gap-3"
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1.5">
@@ -851,9 +851,9 @@ export default function TodayPage() {
           </section>
         )}
 
-        <footer className="mt-8 flex flex-col items-center gap-4 py-8 border-t border-slate-200 dark:border-border-dark">
-          <div className="relative flex flex-col items-center gap-4">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/5 text-primary rounded-full text-sm font-medium border border-primary/10">
+        <footer className="mt-5 flex flex-col items-center gap-3 py-5 border-t border-slate-200 dark:border-border-dark">
+          <div className="relative flex flex-col items-center gap-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/5 text-primary rounded-full text-xs font-medium border border-primary/10">
               <span className="material-symbols-outlined text-sm">spa</span>
               Stay focused. One task at a time.
             </div>

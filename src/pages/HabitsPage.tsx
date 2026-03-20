@@ -219,26 +219,29 @@ export default function HabitsPage() {
   };
 
   return (
-    <div className="max-w-[1200px] mx-auto px-6 py-10 pb-24 md:pb-10 space-y-8">
+    <div className="max-w-[1200px] mx-auto px-6 py-6 pb-24 md:pb-6 space-y-5">
       <section className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Habits</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Fast daily logging with calm, information-dense history.
+          <h1 className="text-2xl font-bold tracking-tight">Habits</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Habits are small, intentional acts you do daily to build momentum. They make your life beautiful and powerful. 
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Not discipline, but devotion ✨
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setShowEdit(true)}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             Manage habits
           </button>
           <button
             type="button"
             onClick={() => setShowAdd(true)}
-            className="px-4 py-2.5 rounded-xl bg-gradient-accent text-white text-sm font-bold shadow-lg shadow-primary/20 hover:opacity-90 transition-all flex items-center gap-1.5"
+            className="px-3 py-2 rounded-xl bg-gradient-accent text-white text-sm font-bold shadow-lg shadow-primary/20 hover:opacity-90 transition-all flex items-center gap-1.5"
           >
             <span className="material-symbols-outlined text-base">add</span>
             Add habit
@@ -246,19 +249,19 @@ export default function HabitsPage() {
         </div>
       </section>
 
-      <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
+      <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Today</p>
-            <p className="font-semibold">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</p>
+            <p className="text-sm font-semibold">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</p>
           </div>
-          <p className="text-sm font-semibold text-primary">{todayCompleted}/{todayHabits.length} completed</p>
+          <p className="text-xs font-semibold text-primary">{todayCompleted}/{todayHabits.length} completed</p>
         </div>
 
         {todayHabits.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">No habits scheduled for today.</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {TIME_OF_DAY_OPTIONS.map((section) => {
               const sectionHabits = todayHabitsByTime[section.value];
               const isOpen = todaySectionsOpen[section.value];
@@ -269,9 +272,9 @@ export default function HabitsPage() {
                     onClick={() =>
                       setTodaySectionsOpen((prev) => ({ ...prev, [section.value]: !prev[section.value] }))
                     }
-                    className="w-full px-3 py-2.5 flex items-center justify-between gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                    className="w-full px-3 py-2 flex items-center justify-between gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <span className={`material-symbols-outlined text-sm transition-transform ${isOpen ? "rotate-90" : ""}`}>
                         chevron_right
                       </span>
@@ -282,7 +285,7 @@ export default function HabitsPage() {
                     </p>
                   </button>
                   {isOpen && (
-                    <div className="p-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                    <div className="px-2.5 pb-2.5 pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2">
                       {sectionHabits.length === 0 ? (
                         <p className="text-sm text-slate-500 dark:text-slate-400">No habits in this section.</p>
                       ) : (
@@ -290,19 +293,19 @@ export default function HabitsPage() {
                           const log = getLog(habit.id, today);
                           const value = getNumericDraftValue(habit.id, today);
                           return (
-                            <div key={habit.id} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col gap-2">
+                            <div key={habit.id} className="rounded-lg border border-slate-200 dark:border-slate-700 px-2.5 py-2 flex flex-col gap-1.5">
                               <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="material-symbols-outlined text-base" style={{ color: habit.color ?? "#a855f7" }}>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="material-symbols-outlined text-sm" style={{ color: habit.color ?? "#a855f7" }}>
                                     {habit.icon ?? "check_circle"}
                                   </span>
-                                  <p className="font-semibold truncate">{habit.name}</p>
+                                  <p className="text-sm font-semibold truncate">{habit.name}</p>
                                 </div>
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1">
                                   <button
                                     type="button"
                                     onClick={() => setStatus(habit, today, log?.status === "DONE" ? "NONE" : "DONE")}
-                                    className={`size-7 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
+                                    className={`size-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
                                       log?.status === "DONE"
                                         ? "border-transparent text-white shadow-md"
                                         : "border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500"
@@ -311,14 +314,14 @@ export default function HabitsPage() {
                                     title={log?.status === "DONE" ? "Uncheck to clear" : "Mark done"}
                                   >
                                     {log?.status === "DONE" ? (
-                                      <span className="material-symbols-outlined text-base font-bold">check</span>
+                                      <span className="material-symbols-outlined text-xs font-bold">check</span>
                                     ) : null}
                                   </button>
                                   {habit.allowPartial && (
                                     <button
                                       type="button"
                                       onClick={() => setStatus(habit, today, "PARTIAL")}
-                                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${log?.status === "PARTIAL" ? "bg-amber-100 dark:bg-amber-900/40 border-amber-400 text-amber-700 dark:text-amber-300" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                                      className={`px-2 py-1 rounded-md text-xs font-semibold border ${log?.status === "PARTIAL" ? "bg-amber-100 dark:bg-amber-900/40 border-amber-400 text-amber-700 dark:text-amber-300" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
                                     >
                                       Partial
                                     </button>
@@ -327,7 +330,7 @@ export default function HabitsPage() {
                                     <button
                                       type="button"
                                       onClick={() => setStatus(habit, today, "SKIP")}
-                                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${log?.status === "SKIP" ? "bg-slate-200 dark:bg-slate-700 border-slate-400 text-slate-700 dark:text-slate-200" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                                      className={`px-2 py-1 rounded-md text-xs font-semibold border ${log?.status === "SKIP" ? "bg-slate-200 dark:bg-slate-700 border-slate-400 text-slate-700 dark:text-slate-200" : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
                                     >
                                       Skip
                                     </button>
@@ -335,10 +338,10 @@ export default function HabitsPage() {
                                 </div>
                               </div>
                               {habit.type !== "CHECK" && (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5">
                                   <button
                                     type="button"
-                                    className="size-7 rounded-lg border border-slate-200 dark:border-slate-700"
+                                    className="size-6 rounded-md border border-slate-200 dark:border-slate-700 text-sm"
                                     onClick={() => stepNumericValue(habit, today, -1)}
                                   >
                                     -
@@ -349,11 +352,11 @@ export default function HabitsPage() {
                                     min={0}
                                     onChange={(e) => setNumericDraftValue(habit.id, today, e.target.value)}
                                     onBlur={() => commitNumericValue(habit, today)}
-                                    className="w-18 text-center rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent px-2 py-1.5 text-sm"
+                                    className="w-16 text-center rounded-md border border-slate-200 dark:border-slate-700 bg-transparent px-2 py-1 text-sm"
                                   />
                                   <button
                                     type="button"
-                                    className="size-7 rounded-lg border border-slate-200 dark:border-slate-700"
+                                    className="size-6 rounded-md border border-slate-200 dark:border-slate-700 text-sm"
                                     onClick={() => stepNumericValue(habit, today, 1)}
                                   >
                                     +
@@ -376,7 +379,7 @@ export default function HabitsPage() {
         )}
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
             {([
@@ -388,7 +391,7 @@ export default function HabitsPage() {
                 key={item.key}
                 type="button"
                 onClick={() => setRange(item.key)}
-                className={`px-4 py-2 text-sm font-semibold ${range === item.key ? "bg-primary text-white" : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                className={`px-3 py-1.5 text-xs font-semibold ${range === item.key ? "bg-primary text-white" : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
               >
                 {item.label}
               </button>
@@ -405,7 +408,7 @@ export default function HabitsPage() {
                 key={item.key}
                 type="button"
                 onClick={() => setHistoryTimeFilter(item.key)}
-                className={`px-3 py-2 text-xs font-semibold ${historyTimeFilter === item.key ? "bg-primary text-white" : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+                className={`px-2.5 py-1.5 text-xs font-semibold ${historyTimeFilter === item.key ? "bg-primary text-white" : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
               >
                 {item.label}
               </button>
@@ -420,7 +423,7 @@ export default function HabitsPage() {
           <div className="overflow-x-auto">
             <div className="min-w-max">
               <div className="flex border-b border-slate-200 dark:border-slate-800">
-                <div className="w-72 shrink-0 px-4 py-3 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                <div className="w-56 shrink-0 px-3 py-2 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                   Habit
                 </div>
                 <div className="flex">
@@ -462,19 +465,16 @@ export default function HabitsPage() {
                     <button
                       type="button"
                       onClick={() => setShowEdit(true)}
-                      className="w-72 shrink-0 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                      className="w-56 shrink-0 px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="material-symbols-outlined text-base" style={{ color: habit.color ?? "#a855f7" }}>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="material-symbols-outlined text-sm" style={{ color: habit.color ?? "#a855f7" }}>
                           {habit.icon ?? "check_circle"}
                         </span>
-                        <p className="font-semibold truncate">{habit.name}</p>
+                        <p className="text-sm font-semibold truncate">{habit.name}</p>
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        {stats.consistencyPct}% consistency • streak {streak}
-                      </p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        {stats.numerator}/{stats.denominator} + {stats.skips} skips
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        {stats.consistencyPct}% • streak {streak} • {stats.numerator}/{stats.denominator}
                       </p>
                     </button>
                     <div className="flex">

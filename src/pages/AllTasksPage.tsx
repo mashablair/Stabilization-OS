@@ -116,8 +116,8 @@ export default function AllTasksPage() {
   const doneTasks = doneTab === "Completed" ? completedTasks : archivedTasks;
 
   return (
-    <div className="max-w-[800px] mx-auto w-full px-6 py-10 pb-24 md:pb-10">
-      <div className="flex items-center gap-2 mb-6 text-sm">
+    <div className="max-w-[800px] mx-auto w-full px-6 py-6 pb-24 md:pb-8">
+      <div className="flex items-center gap-2 mb-4 text-sm">
         <Link to="/" className="text-slate-500 hover:text-primary">
           Today
         </Link>
@@ -125,10 +125,10 @@ export default function AllTasksPage() {
         <span className="font-medium">All Tasks</span>
       </div>
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-4">
         <Link
           to="/today/all?tab=stabilizer"
-          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+          className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
             domainTab === "Life"
               ? "bg-primary/10 text-primary border border-primary"
               : "border border-slate-200 dark:border-border-dark text-slate-500 hover:border-slate-400"
@@ -138,7 +138,7 @@ export default function AllTasksPage() {
         </Link>
         <Link
           to="/today/all?tab=builder"
-          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+          className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
             domainTab === "Builder"
               ? "bg-primary/10 text-primary border border-primary"
               : "border border-slate-200 dark:border-border-dark text-slate-500 hover:border-slate-400"
@@ -149,19 +149,19 @@ export default function AllTasksPage() {
       </div>
 
       {/* Active tasks */}
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
-            <h2 className="text-xl font-bold leading-tight">
+            <h2 className="text-lg font-bold leading-tight">
               All {domainTab === "Life" ? "Life" : "Business"} Tasks
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               {domainTab === "Life"
                 ? "Pin tasks to add them to your Today Stack. Unpin to remove."
                 : "Pin tasks to prioritize them at the top of your Builder Queue."}
             </p>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => setShowLogTaskModal(true)}
               className="text-slate-500 dark:text-slate-400 text-xs font-semibold flex items-center gap-1 hover:text-primary transition-colors"
@@ -183,7 +183,7 @@ export default function AllTasksPage() {
 
         <div className="flex flex-col gap-2">
           {sortedTasks.length === 0 ? (
-            <p className="text-slate-400 py-8 text-center">
+            <p className="text-slate-400 py-6 text-center text-sm">
               No {domainTab === "Life" ? "life" : "business"} tasks yet.
             </p>
           ) : (
@@ -195,7 +195,7 @@ export default function AllTasksPage() {
               return (
                 <div
                   key={task.id}
-                  className="flex items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 dark:border-border-dark bg-white dark:bg-card-dark hover:border-primary/30 transition-colors"
+                  className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 dark:border-border-dark bg-white dark:bg-card-dark hover:border-primary/30 transition-colors"
                 >
                   <Link
                     to={`/tasks/${task.id}`}
@@ -243,18 +243,18 @@ export default function AllTasksPage() {
 
       {/* Pending section */}
       {pendingTasks.length > 0 && (
-        <div className="mt-10">
+        <div className="mt-6">
           <button
             type="button"
             onClick={() => setPendingOpen(!pendingOpen)}
-            className="flex items-center gap-3 py-3 text-left group w-full"
+            className="flex items-center gap-2 py-2 text-left group w-full"
           >
             <span
               className={`material-symbols-outlined text-slate-400 transition-transform ${pendingOpen ? "rotate-90" : ""}`}
             >
               chevron_right
             </span>
-            <h3 className="text-lg font-bold text-slate-600 dark:text-slate-300 group-hover:text-primary transition-colors">
+            <h3 className="text-base font-bold text-slate-600 dark:text-slate-300 group-hover:text-primary transition-colors">
               Pending
             </h3>
             <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold">
@@ -263,16 +263,16 @@ export default function AllTasksPage() {
           </button>
 
           {pendingOpen && (
-            <div className="mt-2 flex flex-col gap-2">
+            <div className="mt-1 flex flex-col gap-2">
               {pendingTasks.map((task) => {
                 const cat = catMap.get(task.categoryId);
                 return (
                   <div
                     key={task.id}
-                    className="flex items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 dark:border-border-dark bg-white/60 dark:bg-card-dark/50 transition-colors"
+                    className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 dark:border-border-dark bg-white/60 dark:bg-card-dark/50 transition-colors"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex items-center gap-2 mb-1">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
                           Pending
                         </span>
@@ -318,18 +318,18 @@ export default function AllTasksPage() {
 
       {/* Done / Archived section */}
       {(completedTasks.length > 0 || archivedTasks.length > 0) && (
-        <div className="mt-10">
+        <div className="mt-6">
           <button
             type="button"
             onClick={() => setDoneOpen(!doneOpen)}
-            className="flex items-center gap-3 py-3 text-left group w-full"
+            className="flex items-center gap-2 py-2 text-left group w-full"
           >
             <span
               className={`material-symbols-outlined text-slate-400 transition-transform ${doneOpen ? "rotate-90" : ""}`}
             >
               chevron_right
             </span>
-            <h3 className="text-lg font-bold text-slate-600 dark:text-slate-300 group-hover:text-primary transition-colors">
+            <h3 className="text-base font-bold text-slate-600 dark:text-slate-300 group-hover:text-primary transition-colors">
               Done
             </h3>
             <span className="px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold">
@@ -338,13 +338,13 @@ export default function AllTasksPage() {
           </button>
 
           {doneOpen && (
-            <div className="mt-2 flex flex-col gap-4">
+            <div className="mt-1 flex flex-col gap-3">
               <div className="flex gap-2">
                 {(["Completed", "Archived"] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => setDoneTab(t)}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
                       doneTab === t
                         ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-800"
                         : "border border-slate-200 dark:border-border-dark text-slate-500 hover:border-slate-400"
@@ -359,7 +359,7 @@ export default function AllTasksPage() {
               </div>
 
               {doneTasks.length === 0 ? (
-                <p className="text-slate-400 py-6 text-center text-sm">
+                <p className="text-slate-400 py-4 text-center text-sm">
                   No {doneTab.toLowerCase()} tasks yet.
                 </p>
               ) : (
@@ -369,7 +369,7 @@ export default function AllTasksPage() {
                     return (
                       <div
                         key={task.id}
-                        className="flex items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 dark:border-border-dark bg-white/60 dark:bg-card-dark/50 transition-colors"
+                        className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 dark:border-border-dark bg-white/60 dark:bg-card-dark/50 transition-colors"
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <button
