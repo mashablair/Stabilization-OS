@@ -118,7 +118,7 @@ export default function SettingsPage() {
         await supabase.from("time_entries").insert({ id: te.id, user_id: uid, task_id: te.taskId, subtask_id: te.subtaskId, start_at: te.startAt, end_at: te.endAt, seconds: te.seconds, pause_reason: te.pauseReason });
       }
       if (bundle.weeklyReviews) for (const wr of bundle.weeklyReviews) {
-        await supabase.from("weekly_reviews").insert({ id: wr.id, user_id: uid, week_start: wr.weekStart, answers: wr.answers, created_at: wr.createdAt });
+        await supabase.from("weekly_reviews").insert({ id: wr.id, user_id: uid, week_start: wr.weekStart, answers: { ...wr.answers, _status: wr.status ?? "completed" }, created_at: wr.createdAt });
       }
       if (bundle.dailyCapacity) for (const dc of bundle.dailyCapacity) {
         await supabase.from("daily_capacity").insert({ id: dc.id, user_id: uid, date: dc.date, domain: dc.domain, minutes: dc.minutes });

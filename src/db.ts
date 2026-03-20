@@ -69,9 +69,12 @@ export interface TimeEntry {
   pauseReason?: string;
 }
 
+export type WeeklyReviewStatus = "completed" | "skipped" | "dismissed";
+
 export interface WeeklyReview {
   id: string;
   weekStart: string;
+  status: WeeklyReviewStatus;
   answers: {
     friction?: string;
     categoryFocus?: string;
@@ -140,6 +143,15 @@ export function nowISO(): string {
 
 export function todayDateStr(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+export function getMondayOfWeek(d: Date): Date {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
 }
 
 // --- Capacity ---
@@ -765,9 +777,26 @@ export async function addWeeklyReview(review: WeeklyReview): Promise<void> {
     id: review.id,
     user_id: userId,
     week_start: review.weekStart,
-    answers: review.answers,
+    answers: { ...review.answers, _status: review.status },
     created_at: review.createdAt,
   });
+  invalidate("weeklyReviews");
+}
+
+export async function updateWeeklyReview(
+  id: string,
+  status: WeeklyReviewStatus,
+  answers: WeeklyReview["answers"]
+): Promise<void> {
+  await supabase
+    .from("weekly_reviews")
+    .update({ answers: { ...answers, _status: status } })
+    .eq("id", id);
+  invalidate("weeklyReviews");
+}
+
+export async function deleteWeeklyReview(id: string): Promise<void> {
+  await supabase.from("weekly_reviews").delete().eq("id", id);
   invalidate("weeklyReviews");
 }
 

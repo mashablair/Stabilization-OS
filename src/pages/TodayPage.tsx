@@ -409,7 +409,7 @@ export default function TodayPage() {
           </div>
           <h1 className="tracking-tight text-3xl font-bold leading-tight">
             {tab === "Life"
-              ? "What needs stabilizing today?"
+              ? "What needs balancing today?"
               : "What are you building today?"}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md mx-auto">

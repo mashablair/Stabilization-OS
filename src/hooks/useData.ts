@@ -63,10 +63,16 @@ function rowToTimeEntry(r: Record<string, unknown>): TimeEntry {
 }
 
 function rowToWeeklyReview(r: Record<string, unknown>): WeeklyReview {
+  const raw = r.answers as Record<string, unknown> | null;
   return {
     id: r.id as string,
     weekStart: r.week_start as string,
-    answers: r.answers as WeeklyReview["answers"],
+    status: ((raw?._status as string) || "completed") as WeeklyReview["status"],
+    answers: {
+      friction: raw?.friction as string | undefined,
+      categoryFocus: raw?.categoryFocus as string | undefined,
+      scariestNextStep: raw?.scariestNextStep as string | undefined,
+    },
     createdAt: r.created_at as string,
   };
 }
