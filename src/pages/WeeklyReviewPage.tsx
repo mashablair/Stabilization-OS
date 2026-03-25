@@ -95,26 +95,40 @@ export default function WeeklyReviewPage() {
 
   const currentMonday = useMemo(() => getMondayOfWeek(new Date()), []);
 
-  const nextReviewMonday = useMemo(() => {
-    const d = new Date(currentMonday);
-    d.setDate(d.getDate() + 7);
-    return d;
+  // Review unlocks Sunday at noon of the reviewed week
+  const isSundayAfternoon = useMemo(() => {
+    const now = new Date();
+    return now.getDay() === 0 && now.getHours() >= 12;
+  }, []);
+
+  const nextReviewDate = useMemo(() => {
+    const thisSunday = new Date(currentMonday);
+    thisSunday.setDate(thisSunday.getDate() + 6);
+    thisSunday.setHours(12, 0, 0, 0);
+
+    const now = new Date();
+    if (now < thisSunday) return thisSunday;
+    const nextSunday = new Date(thisSunday);
+    nextSunday.setDate(nextSunday.getDate() + 7);
+    return nextSunday;
   }, [currentMonday]);
 
-  // Map: mondayKey → review (for all existing reviews)
+  // Map: mondayKey → review (excluding dismissed so those weeks re-enter the queue)
   const reviewsByWeek = useMemo(() => {
     const map = new Map<string, WeeklyReview>();
     for (const r of reviews) {
+      if (r.status === "dismissed") continue;
       const monday = normalizeWeekStartToMonday(r.weekStart);
       map.set(dateKey(monday), r);
     }
     return map;
   }, [reviews]);
 
-  // Up to 3 past weeks that have no review record at all, oldest first
+  // Up to 3 past weeks (+ current week on Sunday afternoon) with no review, oldest first
   const pendingWeeks = useMemo(() => {
     const weeks: Date[] = [];
-    for (let i = 1; i <= 3; i++) {
+    const startI = isSundayAfternoon ? 0 : 1;
+    for (let i = startI; i <= 3; i++) {
       const monday = new Date(currentMonday);
       monday.setDate(monday.getDate() - 7 * i);
       if (!reviewsByWeek.has(dateKey(monday))) {
@@ -122,7 +136,7 @@ export default function WeeklyReviewPage() {
       }
     }
     return weeks.sort((a, b) => a.getTime() - b.getTime());
-  }, [currentMonday, reviewsByWeek]);
+  }, [currentMonday, reviewsByWeek, isSundayAfternoon]);
 
   // Active review week: override (re-doing skipped) > queue head > null
   const activeWeek = useMemo(() => {
@@ -563,14 +577,15 @@ export default function WeeklyReviewPage() {
             All caught up!
           </p>
           <p className="text-xs text-blue-600/80 dark:text-blue-400/80">
-            Next review available on{" "}
+            Next review available{" "}
             <span className="font-bold">
-              Monday,{" "}
-              {nextReviewMonday.toLocaleDateString(undefined, {
+              {nextReviewDate.toLocaleDateString(undefined, {
+                weekday: "long",
                 month: "short",
                 day: "numeric",
                 year: "numeric",
-              })}
+              })}{" "}
+              at noon
             </span>
           </p>
         </div>
@@ -988,7 +1003,7 @@ function PastReviewsList({
               {/* Header row */}
               <div className="flex justify-between items-center mb-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">
+                  <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
                     Week {formatWeekRange(monday)}
                   </span>
                   {isSkipped && (
@@ -1104,20 +1119,29 @@ function PastReviewsList({
 
               {/* Normal answers view */}
               {!isSkipped && !isEditing && !isDeleting && (
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {r.answers.friction && (
-                    <p className="text-xs text-slate-500">
-                      <strong>Friction:</strong> {r.answers.friction}
+                    <p className="text-sm text-slate-900 dark:text-slate-100">
+                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        Friction:{" "}
+                      </span>
+                      {r.answers.friction}
                     </p>
                   )}
                   {r.answers.categoryFocus && (
-                    <p className="text-xs text-slate-500">
-                      <strong>Focus:</strong> {r.answers.categoryFocus}
+                    <p className="text-sm text-slate-900 dark:text-slate-100">
+                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        Focus:{" "}
+                      </span>
+                      {r.answers.categoryFocus}
                     </p>
                   )}
                   {r.answers.scariestNextStep && (
-                    <p className="text-xs text-slate-500">
-                      <strong>Next step:</strong> {r.answers.scariestNextStep}
+                    <p className="text-sm text-slate-900 dark:text-slate-100">
+                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        Next step:{" "}
+                      </span>
+                      {r.answers.scariestNextStep}
                     </p>
                   )}
                 </div>
