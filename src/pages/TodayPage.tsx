@@ -537,7 +537,7 @@ export default function TodayPage() {
                     title="Track Habits"
                   >
                     <span className="material-symbols-outlined text-sm">check_circle</span>
-                    <span className="hidden md:inline">Track habits</span>
+                    <span className="hidden md:inline">Habits</span>
                   </Link>
                   <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all pointer-events-none whitespace-nowrap z-50 md:hidden">
                     Track habits
@@ -551,7 +551,7 @@ export default function TodayPage() {
                     title="View all tasks"
                   >
                     <span className="material-symbols-outlined text-sm">list</span>
-                    <span className="hidden md:inline">All tasks</span>
+                    <span className="hidden md:inline">Tasks</span>
                   </button>
                   <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all pointer-events-none whitespace-nowrap z-50 md:hidden">
                     All tasks

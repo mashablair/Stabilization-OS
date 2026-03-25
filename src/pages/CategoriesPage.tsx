@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useCategories, useAppSettings, useTasks } from "../hooks/useData";
 import {
   getCategoriesByDomain,
@@ -20,6 +20,8 @@ const kindIcons: Record<string, string> = {
 const MAX_CUSTOM_CATEGORIES = 5;
 
 export default function CategoriesPage() {
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
   const { data: allCategories = [] } = useCategories();
   const { data: settings } = useAppSettings();
   const { data: tasks = [] } = useTasks();
@@ -88,8 +90,17 @@ export default function CategoriesPage() {
   return (
     <div className="max-w-[1400px] mx-auto w-full px-6 py-10 lg:px-20 pb-24 md:pb-10">
       <div className="flex flex-col gap-2 mb-10">
+        {returnTo ? (
+          <Link
+            to={returnTo}
+            className="text-sm font-semibold text-slate-500 hover:text-primary flex items-center gap-1 w-fit mb-1"
+          >
+            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            Back to Today
+          </Link>
+        ) : null}
         <h1 className="text-4xl font-bold tracking-tight">Categories</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-lg max-w-2xl leading-relaxed">A calm space to manage your high-level domains. Clear the mental clutter by grounding yourself in what matters most.</p>
+        <p className="text-slate-500 dark:text-slate-400 text-lg max-w-2xl leading-relaxed">Clear the mental clutter by grounding yourself in what matters most. Manage your high-level domains.</p>
       </div>
 
       <div className="flex flex-col gap-8">

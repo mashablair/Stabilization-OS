@@ -170,6 +170,14 @@ export default function AllTasksPage() {
               <span className="material-symbols-outlined text-[16px]">history_edu</span>
               Log
             </button>
+            <Link
+              to="/categories"
+              className="text-slate-500 dark:text-slate-400 text-xs font-semibold flex items-center gap-1 hover:text-primary transition-colors"
+              title="Categories"
+            >
+              <span className="material-symbols-outlined text-[16px]">category</span>
+              Categories
+            </Link>
             <button
               onClick={() => setShowAddTaskModal(true)}
               className="text-primary text-xs font-bold flex items-center gap-1 hover:text-primary/80 transition-colors"

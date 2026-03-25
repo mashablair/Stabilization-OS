@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCategories } from "../hooks/useData";
 import {
   generateId,
@@ -26,6 +27,7 @@ export default function LogTaskModal({
   defaultDomain = "LIFE_ADMIN",
   defaultDate,
 }: Props) {
+  const navigate = useNavigate();
   const { data: allCategories = [] } = useCategories();
   const [domain, setDomain] = useState<TaskDomain>(defaultDomain);
   const categories = getCategoriesByDomain(allCategories, domain);
@@ -171,10 +173,10 @@ export default function LogTaskModal({
               </label>
               {categories.length === 0 ? (
                 <p className="text-sm text-amber-600 dark:text-amber-400">
-                  Add a category first in Settings.
+                  No categories for this domain. Open Settings → Customize → Categories.
                 </p>
               ) : (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   {categories.map((cat) => (
                     <button
                       key={cat.id}
@@ -190,6 +192,17 @@ export default function LogTaskModal({
                       {cat.name}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      navigate("/categories", { state: { returnTo: "/" } });
+                    }}
+                    className="size-9 shrink-0 rounded-full border border-slate-200 dark:border-border-dark text-slate-500 hover:border-primary hover:text-primary flex items-center justify-center transition-all"
+                    title="Manage categories"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">add</span>
+                  </button>
                 </div>
               )}
             </div>

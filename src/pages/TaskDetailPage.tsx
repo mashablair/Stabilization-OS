@@ -180,6 +180,8 @@ export default function TaskDetailPage() {
   }
 
   const cat = allCategories.find((c) => c.id === task.categoryId);
+  const allTasksHref =
+    task.domain === "BUSINESS" ? "/today/all?tab=builder" : "/today/all?tab=stabilizer";
   const totalEstimateMinutes = getTaskEstimateMinutes(task);
   const activeSubtask = task.subtasks.find((subtask) => subtask.id === timer.activeSubtaskId);
   const selectedSubtask = task.subtasks.find((subtask) => subtask.id === selectedSubtaskId);
@@ -447,7 +449,14 @@ export default function TaskDetailPage() {
 
   return (
     <div className="max-w-7xl mx-auto w-full px-4 lg:px-8 py-4 pb-20 md:pb-4">
-      <div className="flex items-center gap-2 mb-3 text-sm">
+      <div className="nav:hidden flex items-center gap-2 mb-3 text-sm">
+        <Link to={allTasksHref} className="text-slate-500 hover:text-primary">
+          All Tasks
+        </Link>
+        <span className="text-slate-300">/</span>
+        <span className="font-medium">Task Detail</span>
+      </div>
+      <div className="hidden nav:flex items-center gap-2 mb-3 text-sm">
         <Link to="/categories" className="text-slate-500 hover:text-primary">
           Categories
         </Link>

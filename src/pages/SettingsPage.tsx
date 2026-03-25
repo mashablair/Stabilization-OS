@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAppSettings } from "../hooks/useData";
 import { updateAppSettings, resetAllData, type Category, type Task, type TimeEntry, type WeeklyReview, type DailyCapacity, type AppSettings } from "../db";
 import { supabase } from "../lib/supabase";
@@ -220,6 +221,25 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        </section>
+
+        <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+          <h3 className="font-bold text-lg mb-1">Customize</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Tune how Balance OS is organized for you.</p>
+          <ul className="flex flex-col gap-2">
+            <li>
+              <Link
+                to="/categories"
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 font-semibold text-slate-700 dark:text-slate-200 hover:border-primary hover:bg-primary/5 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[20px]">category</span>
+                  Categories
+                </span>
+                <span className="material-symbols-outlined text-slate-400 text-[20px]">chevron_right</span>
+              </Link>
+            </li>
+          </ul>
         </section>
 
         <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6">

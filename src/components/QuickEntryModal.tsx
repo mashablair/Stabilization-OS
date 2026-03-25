@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCategories } from "../hooks/useData";
 import { generateId, nowISO, getCategoriesByDomain, addTask, type Task, type TaskDomain } from "../db";
 
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_ADMIN", addToTodayStack = false }: Props) {
+  const navigate = useNavigate();
   const { data: allCategories = [] } = useCategories();
   const [domain, setDomain] = useState<TaskDomain>(defaultDomain);
   const categories = getCategoriesByDomain(allCategories, domain);
@@ -152,7 +154,7 @@ export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_A
               <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 ml-1">
                 Category
               </label>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5 items-center">
                 {categories.map((cat) => (
                   <button
                     key={cat.id}
@@ -168,6 +170,17 @@ export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_A
                     {cat.name}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    navigate("/categories", { state: { returnTo: "/" } });
+                  }}
+                  className="size-8 shrink-0 rounded-full border border-slate-200 dark:border-border-dark text-slate-500 hover:border-primary hover:text-primary flex items-center justify-center transition-all"
+                  title="Manage categories"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add</span>
+                </button>
               </div>
             </div>
 

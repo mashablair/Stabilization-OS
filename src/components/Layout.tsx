@@ -21,7 +21,6 @@ const logoSvg = (
 const navItems = [
   { to: "/", label: "Today", icon: "layers" },
   { to: "/today/all", label: "All Tasks", icon: "checklist" },
-  { to: "/categories", label: "Categories", icon: "category" },
   { to: "/dashboard", label: "Dashboard", icon: "grid_view" },
   { to: "/review", label: "Review", icon: "rate_review" },
   { to: "/wins", label: "Wins", icon: "emoji_events" },
