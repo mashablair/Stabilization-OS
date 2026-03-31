@@ -1,5 +1,7 @@
 import { supabase } from "./lib/supabase";
 import { queryClient } from "./lib/queryClient";
+import { todayDateStr } from "./lib/timezone";
+export { todayDateStr } from "./lib/timezone";
 import {
   rowToCategory,
   rowToTask,
@@ -100,6 +102,7 @@ export interface AppSettings {
   builderAvailableMinutes: number;
   darkMode: boolean;
   hiddenCategoryIds?: string[];
+  timezone?: string;
 }
 
 export interface DailyCapacity {
@@ -141,9 +144,6 @@ export function nowISO(): string {
   return new Date().toISOString();
 }
 
-export function todayDateStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export function getMondayOfWeek(d: Date): Date {
   const date = new Date(d);
@@ -467,6 +467,7 @@ export async function toggleCategoryVisibility(categoryId: string): Promise<void
     builder_available_minutes: s?.builderAvailableMinutes ?? 120,
     dark_mode: s?.darkMode ?? false,
     hidden_category_ids: next,
+    timezone: s?.timezone ?? null,
   });
   invalidate("appSettings");
 }
@@ -744,6 +745,7 @@ export async function updateAppSettings(fields: Partial<AppSettings>): Promise<v
     builderAvailableMinutes: "builder_available_minutes",
     darkMode: "dark_mode",
     hiddenCategoryIds: "hidden_category_ids",
+    timezone: "timezone",
   };
   for (const [key, value] of Object.entries(fields)) {
     if (key === "id") continue;

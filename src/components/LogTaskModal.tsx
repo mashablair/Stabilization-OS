@@ -55,7 +55,7 @@ export default function LogTaskModal({
     const durationMins = Math.min(Math.max(1, Math.round(duration)), MAX_DURATION_MINUTES);
     const seconds = durationMins * 60;
 
-    const startAt = `${date}T12:00:00.000Z`;
+    const startAt = `${date}T12:00:00`;
     const startMs = new Date(startAt).getTime();
     const endAt = new Date(startMs + seconds * 1000).toISOString();
 

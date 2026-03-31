@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAppSettings } from "../hooks/useData";
 import { updateAppSettings } from "../db";
 import { useAuth } from "../lib/AuthContext";
+import { setActiveTimezone } from "../lib/timezone";
 
 const logoSvg = (
   <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
@@ -31,6 +33,12 @@ export default function Layout() {
   const { data: settings } = useAppSettings();
   const { signOut } = useAuth();
   const isDark = settings?.darkMode ?? false;
+
+  useEffect(() => {
+    if (settings?.timezone) {
+      setActiveTimezone(settings.timezone);
+    }
+  }, [settings?.timezone]);
 
   return (
     <div className={isDark ? "dark" : ""}>

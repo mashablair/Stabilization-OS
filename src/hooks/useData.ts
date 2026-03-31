@@ -97,6 +97,7 @@ function rowToAppSettings(r: Record<string, unknown>): AppSettings {
     builderAvailableMinutes: (r.builder_available_minutes as number) ?? 120,
     darkMode: (r.dark_mode as boolean) ?? false,
     hiddenCategoryIds: r.hidden_category_ids as string[] | undefined,
+    timezone: r.timezone as string | undefined,
   };
 }
 

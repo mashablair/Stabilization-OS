@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAppSettings } from "../hooks/useData";
-import { updateAppSettings, resetAllData, type Category, type Task, type TimeEntry, type WeeklyReview, type DailyCapacity, type AppSettings } from "../db";
+import { updateAppSettings, resetAllData, todayDateStr, type Category, type Task, type TimeEntry, type WeeklyReview, type DailyCapacity, type AppSettings } from "../db";
+import { getSupportedTimezones, setActiveTimezone, getActiveTimezone } from "../lib/timezone";
 import { supabase } from "../lib/supabase";
 import { rowToCategory, rowToTask, rowToTimeEntry, rowToWeeklyReview, rowToDailyCapacity, rowToWin, rowToHabit, rowToHabitLog, rowToAppSettings } from "../hooks/useData";
 import type { Habit, HabitLog } from "../habits";
@@ -20,6 +21,8 @@ interface ShareBundle {
   appSettings?: AppSettings;
 }
 
+const ALL_TIMEZONES = getSupportedTimezones();
+
 export default function SettingsPage() {
   const { data: settings } = useAppSettings();
   const [importing, setImporting] = useState(false);
@@ -27,6 +30,9 @@ export default function SettingsPage() {
   const [stabilizerDraft, setStabilizerDraft] = useState("");
   const [builderDraft, setBuilderDraft] = useState("");
   const [dirtyFields, setDirtyFields] = useState<Set<"availableMinutes" | "builderAvailableMinutes">>(new Set());
+  const [tzSearch, setTzSearch] = useState("");
+  const [tzSaved, setTzSaved] = useState(false);
+  const [selectedTz, setSelectedTz] = useState<string>(() => getActiveTimezone());
 
   const stabilizerDefault = settings?.availableMinutes ?? 120;
   const builderDefault = settings?.builderAvailableMinutes ?? 120;
@@ -53,10 +59,24 @@ export default function SettingsPage() {
     }
   }, [builderDefault, dirtyFields]);
 
+  useEffect(() => {
+    if (settings?.timezone) {
+      setSelectedTz(settings.timezone);
+    }
+  }, [settings?.timezone]);
+
   const commitSetting = async (field: "availableMinutes" | "builderAvailableMinutes") => {
     const raw = field === "availableMinutes" ? stabilizerDraft : builderDraft;
     const parsed = Number(raw);
     await updateSetting(field, Number.isFinite(parsed) ? parsed : 0);
+  };
+
+  const saveTz = async (tz: string) => {
+    setSelectedTz(tz);
+    setActiveTimezone(tz);
+    await updateAppSettings({ timezone: tz });
+    setTzSaved(true);
+    setTimeout(() => setTzSaved(false), 2000);
   };
 
   const exportBundle = async () => {
@@ -89,7 +109,7 @@ export default function SettingsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `balance-os-bundle-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `balance-os-bundle-${todayDateStr()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -134,7 +154,7 @@ export default function SettingsPage() {
         await supabase.from("habit_logs").insert({ id: hl.id, user_id: uid, habit_id: hl.habitId, date: hl.date, status: hl.status, value: hl.value, note: hl.note, created_at: hl.createdAt, updated_at: hl.updatedAt });
       }
       if (bundle.appSettings) {
-        await supabase.from("app_settings").upsert({ id: "default", user_id: uid, role: bundle.appSettings.role, available_minutes: bundle.appSettings.availableMinutes, builder_available_minutes: bundle.appSettings.builderAvailableMinutes, dark_mode: bundle.appSettings.darkMode, hidden_category_ids: bundle.appSettings.hiddenCategoryIds });
+        await supabase.from("app_settings").upsert({ id: "default", user_id: uid, role: bundle.appSettings.role, available_minutes: bundle.appSettings.availableMinutes, builder_available_minutes: bundle.appSettings.builderAvailableMinutes, dark_mode: bundle.appSettings.darkMode, hidden_category_ids: bundle.appSettings.hiddenCategoryIds, timezone: bundle.appSettings.timezone ?? null });
       }
 
       setImportStatus(`Imported ${bundle.categories.length} categories, ${bundle.tasks.length} tasks, ${bundle.timeEntries.length} time entries, ${bundle.wins?.length ?? 0} wins, ${bundle.habits?.length ?? 0} habits, and ${bundle.habitLogs?.length ?? 0} habit logs.`);
@@ -219,6 +239,57 @@ export default function SettingsPage() {
                 />
                 <span className="text-sm font-medium text-slate-400">minutes / day</span>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+          <h3 className="font-bold text-lg mb-1">Timezone</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+            Choose your timezone so that "today" and daily habit logs always match your local calendar date — not the UTC clock.
+            Your browser detected <span className="font-semibold text-slate-700 dark:text-slate-200">{Intl.DateTimeFormat().resolvedOptions().timeZone}</span>.
+          </p>
+
+          <div className="flex flex-col gap-3">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px]">search</span>
+              <input
+                type="text"
+                placeholder="Search timezones…"
+                value={tzSearch}
+                onChange={(e) => setTzSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-100 dark:bg-background-dark border-none text-sm focus:ring-2 focus:ring-primary transition-all"
+              />
+            </div>
+
+            <div className="relative">
+              <select
+                value={selectedTz}
+                onChange={(e) => saveTz(e.target.value)}
+                size={6}
+                className="w-full rounded-xl bg-slate-100 dark:bg-background-dark border border-slate-200 dark:border-slate-700 text-sm px-3 py-1 focus:ring-2 focus:ring-primary transition-all overflow-auto"
+              >
+                {ALL_TIMEZONES.filter((tz) =>
+                  tzSearch.trim() === "" || tz.toLowerCase().includes(tzSearch.toLowerCase())
+                ).map((tz) => (
+                  <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                Currently set to:{" "}
+                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                  {selectedTz.replace(/_/g, " ")}
+                </span>
+              </span>
+              {tzSaved && (
+                <span className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                  <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                  Saved
+                </span>
+              )}
             </div>
           </div>
         </section>

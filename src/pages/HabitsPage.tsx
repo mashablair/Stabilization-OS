@@ -540,12 +540,14 @@ export default function HabitsPage() {
         onPrev={() => {
           const d = new Date(`${dayEditor.date}T00:00:00`);
           d.setDate(d.getDate() - 1);
-          setDayEditor({ open: true, date: d.toISOString().slice(0, 10) });
+          const y = d.getFullYear(), mo = String(d.getMonth() + 1).padStart(2, "0"), dy = String(d.getDate()).padStart(2, "0");
+          setDayEditor({ open: true, date: `${y}-${mo}-${dy}` });
         }}
         onNext={() => {
           const d = new Date(`${dayEditor.date}T00:00:00`);
           d.setDate(d.getDate() + 1);
-          setDayEditor({ open: true, date: d.toISOString().slice(0, 10) });
+          const y = d.getFullYear(), mo = String(d.getMonth() + 1).padStart(2, "0"), dy = String(d.getDate()).padStart(2, "0");
+          setDayEditor({ open: true, date: `${y}-${mo}-${dy}` });
         }}
         habits={activeHabits}
         getLog={getLog}

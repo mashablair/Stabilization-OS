@@ -644,7 +644,8 @@ describe("getEffectiveMinutes", () => {
     darkMode: false,
   };
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const _d = new Date();
+  const todayStr = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, "0")}-${String(_d.getDate()).padStart(2, "0")}`;
 
   it("returns stabilizer default when no daily override", () => {
     expect(getEffectiveMinutes(baseSettings, undefined, "LIFE_ADMIN")).toBe(120);

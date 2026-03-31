@@ -7,9 +7,10 @@ const WIN_TAGS: WinTag[] = ["life", "biz", "vitality", "community"];
 type PeriodView = "week" | "month" | "quarter" | "year";
 
 function getWeekStart(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() - d.getDay());
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function getMonthKey(dateStr: string): string {
