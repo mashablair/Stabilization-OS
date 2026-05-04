@@ -6,30 +6,35 @@ const WIN_TAGS: WinTag[] = ["life", "biz", "vitality", "community"];
 
 type PeriodView = "week" | "month" | "quarter" | "year";
 
+/** YYYY-MM-DD as a calendar date in local time (avoids UTC parsing of bare ISO dates). */
+function parseCalendarDate(dateStr: string): Date {
+  return new Date(`${dateStr}T00:00:00`);
+}
+
 function getWeekStart(dateStr: string): string {
-  const d = new Date(`${dateStr}T00:00:00`);
+  const d = parseCalendarDate(dateStr);
   d.setDate(d.getDate() - d.getDay());
   const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
 function getMonthKey(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = parseCalendarDate(dateStr);
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
 function getQuarterKey(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = parseCalendarDate(dateStr);
   const q = Math.floor(d.getMonth() / 3) + 1;
   return `Q${q} ${d.getFullYear()}`;
 }
 
 function getYearKey(dateStr: string): string {
-  return new Date(dateStr).getFullYear().toString();
+  return parseCalendarDate(dateStr).getFullYear().toString();
 }
 
 function formatWeekLabel(weekStart: string): string {
-  return `Week of ${new Date(weekStart).toLocaleDateString("en-US", {
+  return `Week of ${parseCalendarDate(weekStart).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -46,13 +51,13 @@ function groupWinsByPeriod(wins: Win[], period: PeriodView): Map<string, Win[]> 
     map.set(key, list);
   }
   for (const list of map.values()) {
-    list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    list.sort((a, b) => b.date.localeCompare(a.date));
   }
   return map;
 }
 
 function sortPeriodKeys(keys: string[], period: PeriodView): string[] {
-  if (period === "week") return keys.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  if (period === "week") return keys.sort((a, b) => b.localeCompare(a));
   if (period === "month" || period === "quarter") {
     return keys.sort((a, b) => {
       const [aPart, aYear] = a.split(" ");
@@ -217,7 +222,7 @@ export default function WinsPage() {
                               ))}
                             </div>
                           )}
-                          <span className="text-xs text-slate-400">{new Date(win.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+                          <span className="text-xs text-slate-400">{parseCalendarDate(win.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
                           <button onClick={() => startEditing(win)} className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-800 transition-colors" title="Edit win">
                             <span className="material-symbols-outlined text-base">edit</span>
                           </button>
