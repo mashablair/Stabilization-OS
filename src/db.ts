@@ -136,6 +136,27 @@ function invalidate(...keys: string[]) {
   }
 }
 
+/** Pass `skipInvalidate` when the caller updates React Query caches or runs a targeted invalidation. */
+export type DbMutationOptions = {
+  skipInvalidate?: boolean;
+};
+
+function throwIfDbError(error: { message?: string } | null | undefined, fallback: string): void {
+  if (error) throw new Error(error.message || fallback);
+}
+
+/** Invalidate list + detail task queries and time-entry queries for one task (timer flows). */
+export function invalidateTaskTimeQueriesForTask(userId: string, taskId: string): void {
+  queryClient.invalidateQueries({ queryKey: ["tasks", userId], exact: true });
+  queryClient.invalidateQueries({ queryKey: ["tasks", userId, taskId], exact: true });
+  queryClient.invalidateQueries({ queryKey: ["timeEntries", userId], exact: true });
+  queryClient.invalidateQueries({ queryKey: ["timeEntries", userId, "task", taskId], exact: true });
+}
+
+export function invalidateTimerStateQuery(userId: string): void {
+  queryClient.invalidateQueries({ queryKey: ["timerState", userId], exact: true });
+}
+
 export function generateId(): string {
   return crypto.randomUUID();
 }
@@ -630,7 +651,11 @@ export async function seedDatabase() {
 
 // --- Supabase mutation helpers for pages ---
 
-export async function updateTask(taskId: string, fields: Partial<Record<string, unknown>>): Promise<void> {
+export async function updateTask(
+  taskId: string,
+  fields: Partial<Record<string, unknown>>,
+  options?: DbMutationOptions
+): Promise<void> {
   const snakeFields: Record<string, unknown> = {};
   const fieldMap: Record<string, string> = {
     categoryId: "category_id",
@@ -659,8 +684,9 @@ export async function updateTask(taskId: string, fields: Partial<Record<string, 
     snakeFields[snakeKey] = value === undefined ? null : value;
   }
   if (!snakeFields.updated_at) snakeFields.updated_at = nowISO();
-  await supabase.from("tasks").update(snakeFields).eq("id", taskId);
-  invalidate("tasks");
+  const { error } = await supabase.from("tasks").update(snakeFields).eq("id", taskId);
+  throwIfDbError(error, "Could not update task");
+  if (!options?.skipInvalidate) invalidate("tasks");
 }
 
 export async function addTask(task: Task): Promise<void> {
@@ -699,9 +725,9 @@ export async function deleteTask(taskId: string): Promise<void> {
   invalidate("tasks", "timeEntries");
 }
 
-export async function addTimeEntry(entry: TimeEntry): Promise<void> {
+export async function addTimeEntry(entry: TimeEntry, options?: DbMutationOptions): Promise<void> {
   const userId = await getUserId();
-  await supabase.from("time_entries").insert({
+  const { error } = await supabase.from("time_entries").insert({
     id: entry.id,
     user_id: userId,
     task_id: entry.taskId,
@@ -711,10 +737,15 @@ export async function addTimeEntry(entry: TimeEntry): Promise<void> {
     seconds: entry.seconds,
     pause_reason: entry.pauseReason,
   });
-  invalidate("timeEntries");
+  throwIfDbError(error, "Could not add time entry");
+  if (!options?.skipInvalidate) invalidate("timeEntries");
 }
 
-export async function updateTimeEntry(id: string, fields: Record<string, unknown>): Promise<void> {
+export async function updateTimeEntry(
+  id: string,
+  fields: Record<string, unknown>,
+  options?: DbMutationOptions
+): Promise<void> {
   const snakeFields: Record<string, unknown> = {};
   const fieldMap: Record<string, string> = {
     endAt: "end_at", seconds: "seconds", pauseReason: "pause_reason",
@@ -723,13 +754,15 @@ export async function updateTimeEntry(id: string, fields: Record<string, unknown
   for (const [key, value] of Object.entries(fields)) {
     snakeFields[fieldMap[key] ?? key] = value === undefined ? null : value;
   }
-  await supabase.from("time_entries").update(snakeFields).eq("id", id);
-  invalidate("timeEntries");
+  const { error } = await supabase.from("time_entries").update(snakeFields).eq("id", id);
+  throwIfDbError(error, "Could not update time entry");
+  if (!options?.skipInvalidate) invalidate("timeEntries");
 }
 
-export async function deleteTimeEntry(id: string): Promise<void> {
-  await supabase.from("time_entries").delete().eq("id", id);
-  invalidate("timeEntries");
+export async function deleteTimeEntry(id: string, options?: DbMutationOptions): Promise<void> {
+  const { error } = await supabase.from("time_entries").delete().eq("id", id);
+  throwIfDbError(error, "Could not delete time entry");
+  if (!options?.skipInvalidate) invalidate("timeEntries");
 }
 
 export async function deleteTimeEntriesForTask(taskId: string): Promise<void> {
@@ -858,17 +891,18 @@ export async function bulkPutHabits(habits: Habit[]): Promise<void> {
 // --- Timer state helpers ---
 
 export async function getTimerState(): Promise<TimerState | undefined> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("timer_state")
     .select("*")
     .eq("id", "active")
     .maybeSingle();
+  throwIfDbError(error, "Could not load timer state");
   return data ? rowToTimerState(data) : undefined;
 }
 
-export async function putTimerState(state: TimerState): Promise<void> {
+export async function putTimerState(state: TimerState, options?: DbMutationOptions): Promise<void> {
   const userId = await getUserId();
-  await supabase.from("timer_state").upsert({
+  const { error } = await supabase.from("timer_state").upsert({
     id: state.id,
     user_id: userId,
     task_id: state.taskId,
@@ -878,10 +912,14 @@ export async function putTimerState(state: TimerState): Promise<void> {
     paused_at: state.pausedAt,
     accumulated_seconds: state.accumulatedSeconds,
   });
-  invalidate("timerState");
+  throwIfDbError(error, "Could not save timer state");
+  if (!options?.skipInvalidate) invalidate("timerState");
 }
 
-export async function updateTimerState(fields: Partial<TimerState>): Promise<void> {
+export async function updateTimerState(
+  fields: Partial<TimerState>,
+  options?: DbMutationOptions
+): Promise<void> {
   const snakeFields: Record<string, unknown> = {};
   const fieldMap: Record<string, string> = {
     startedAt: "started_at", pausedAt: "paused_at",
@@ -893,13 +931,15 @@ export async function updateTimerState(fields: Partial<TimerState>): Promise<voi
     if (key === "id") continue;
     snakeFields[fieldMap[key] ?? key] = value === undefined ? null : value;
   }
-  await supabase.from("timer_state").update(snakeFields).eq("id", "active");
-  invalidate("timerState");
+  const { error } = await supabase.from("timer_state").update(snakeFields).eq("id", "active");
+  throwIfDbError(error, "Could not update timer state");
+  if (!options?.skipInvalidate) invalidate("timerState");
 }
 
-export async function deleteTimerState(): Promise<void> {
-  await supabase.from("timer_state").delete().eq("id", "active");
-  invalidate("timerState");
+export async function deleteTimerState(options?: DbMutationOptions): Promise<void> {
+  const { error } = await supabase.from("timer_state").delete().eq("id", "active");
+  throwIfDbError(error, "Could not clear timer state");
+  if (!options?.skipInvalidate) invalidate("timerState");
 }
 
 export async function resetAllData(): Promise<void> {

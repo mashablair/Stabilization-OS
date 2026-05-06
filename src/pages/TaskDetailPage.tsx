@@ -394,6 +394,14 @@ export default function TaskDetailPage() {
     return null;
   };
 
+  const switchFocusSubtask = (newSubtaskId: string) => {
+    if (!newSubtaskId || newSubtaskId === focusSubtask?.id) return;
+    setSelectedSubtaskId(newSubtaskId);
+    if (timer.activeTaskId === task.id && timer.activeSubtaskId !== newSubtaskId) {
+      timer.startTimer(task.id, newSubtaskId);
+    }
+  };
+
   const addManualTime = async () => {
     const minutes = parseAddTimeInput(addTimeInput);
     if (minutes == null || minutes <= 0) return;
@@ -862,7 +870,21 @@ export default function TaskDetailPage() {
               <div className="text-slate-400 text-xs font-bold uppercase tracking-widest">
                 Subtask Timer
               </div>
-              {focusSubtask?.title ? (
+              {task.subtasks.length > 1 ? (
+                <select
+                  value={focusSubtask?.id ?? ""}
+                  onChange={(e) => switchFocusSubtask(e.target.value)}
+                  className="max-w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 focus:ring-2 focus:ring-primary focus:outline-none cursor-pointer"
+                  title="Switch focused subtask"
+                >
+                  {task.subtasks.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.title || "Untitled subtask"}
+                      {sub.done ? " (done)" : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : focusSubtask?.title ? (
                 <div className="text-slate-500 dark:text-slate-400 text-xs font-medium">
                   {focusSubtask.title}
                 </div>

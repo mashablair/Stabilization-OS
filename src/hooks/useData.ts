@@ -297,8 +297,11 @@ export function useTimerState() {
   return useQuery({
     queryKey: ["timerState", user?.id],
     enabled: !!user?.id,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    // Single-tab scope: the only writer to timer_state is this tab, so we
+    // manage freshness via setQueryData / explicit invalidation. Avoid
+    // refetching on window focus to prevent racing with optimistic updates.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("timer_state")
