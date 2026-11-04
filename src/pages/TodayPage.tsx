@@ -4,7 +4,7 @@ import { useAppSettings, useCategories, useTasks, useTimeEntries, useDailyCapaci
 import {
   buildStabilizerStackSplit,
   getWaitingTasks,
-  isActionable,
+  buildBuilderToday,
   markTaskDone,
   nowISO,
   unmarkTaskDone,
@@ -94,11 +94,9 @@ export default function TodayPage() {
   );
   const stabilizerTasks = [...stabilizerPinned, ...stabilizerSuggested];
 
-  const builderActionable = useMemo(
+  const builderToday = useMemo(
     () =>
-      allTasks.filter(
-        (t) => t.domain === "BUSINESS" && isActionable(t)
-      ),
+      buildBuilderToday(allTasks),
     [allTasks]
   );
 
@@ -152,7 +150,7 @@ export default function TodayPage() {
     return items;
   }, [allTasks, tab, todayStart]);
 
-  const todayTasks = tab === "Life" ? stabilizerTasks : builderActionable;
+  const todayTasks = tab === "Life" ? stabilizerTasks : builderToday;
 
   const allocatedMins = todayTasks.reduce(
     (s, t) => s + getTaskEstimateMinutes(t),
@@ -208,7 +206,7 @@ export default function TodayPage() {
     await updateTask(taskId, { status: "BACKLOG", updatedAt: nowISO() });
   };
 
-  const stackCount = tab === "Life" ? stabilizerTasks.length : builderActionable.length;
+  const stackCount = tab === "Life" ? stabilizerTasks.length : builderToday.length;
   const stackFull = tab === "Life" && stabilizerPinned.length >= 5;
 
   const renderTaskCard = (
@@ -256,10 +254,12 @@ export default function TodayPage() {
             {showPinActions && isPinned && (
               <button
                 onClick={() => removeFromToday(task.id)}
-                className="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+                className={`${tab === "Builder" ? "min-h-8 px-2" : "size-8"} shrink-0 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors`}
                 title="Remove from today"
+                aria-label={`Remove ${task.title} from today`}
               >
-                <span className="material-symbols-outlined text-sm">push_pin</span>
+                <span className="material-symbols-outlined text-sm">remove_circle_outline</span>
+                {tab === "Builder" && <span className="ml-1 text-xs">Remove from today</span>}
               </button>
             )}
             {showPinActions && !isPinned && canPin && (
@@ -415,7 +415,7 @@ export default function TodayPage() {
           <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md mx-auto">
             {tab === "Life"
               ? "Focus on the foundations. Legal and financial tasks come first."
-              : "Business tasks live here. Ship when you're ready."}
+              : "Choose your tasks for today. Everything else stays in All Tasks."}
           </p>
           <div className="flex p-1 rounded-xl bg-slate-200 dark:bg-card-dark border border-slate-300 dark:border-border-dark self-center w-full max-w-sm">
             {(["Life", "Builder"] as const).map((t) => (
@@ -436,7 +436,7 @@ export default function TodayPage() {
         </section>
 
         {/* Capacity */}
-        {(tab === "Life" || (tab === "Builder" && builderActionable.length > 0)) && (
+        {(tab === "Life" || (tab === "Builder" && builderToday.length > 0)) && (
           <section className="flex flex-col items-center gap-3 bg-primary/5 p-4 rounded-xl border border-primary/10 mb-4">
             <div className="flex flex-col items-center gap-1.5">
               <h3 className="text-slate-700 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
@@ -519,10 +519,10 @@ export default function TodayPage() {
         {/* Today Stack */}
         <section className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-lg font-bold leading-tight flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[22px]">layers</span>
-                {tab === "Life" ? "Today Stack" : "Builder Queue"}
+                {tab === "Life" ? "Today Stack" : "Today’s Builder Tasks"}
                 {tab === "Life" && (
                   <span className="hidden md:inline text-slate-400 font-normal text-sm">
                     ({stackCount}/5)
@@ -548,10 +548,10 @@ export default function TodayPage() {
                   <button
                     onClick={() => setShowAllTasksDrawer(true)}
                     className="text-slate-600 dark:text-slate-400 text-sm font-semibold flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
-                    title="View all tasks"
+                    title="Choose tasks for today"
                   >
                     <span className="material-symbols-outlined text-sm">list</span>
-                    <span className="hidden md:inline">Tasks</span>
+                    <span>Choose tasks</span>
                   </button>
                   <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all pointer-events-none whitespace-nowrap z-50 md:hidden">
                     All tasks
@@ -587,6 +587,11 @@ export default function TodayPage() {
                 </div>
               </div>
             </div>
+            {tab === "Builder" && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Only tasks you choose for today appear here. Remove a task to return it to All Tasks.
+              </p>
+            )}
             {tab === "Life" && (
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Up to 5 tasks. Pin tasks from All Tasks to customize your stack.
@@ -595,21 +600,21 @@ export default function TodayPage() {
           </div>
 
           {/* Builder empty state */}
-          {tab === "Builder" && builderActionable.length === 0 && (
+          {tab === "Builder" && builderToday.length === 0 && (
             <div className="text-center py-10 px-4">
               <div className="inline-flex items-center justify-center size-14 rounded-xl bg-slate-100 dark:bg-card-dark mb-3">
                 <span className="material-symbols-outlined text-2xl text-slate-400">pause_circle</span>
               </div>
-              <h3 className="text-lg font-bold mb-1.5">Builder is paused</h3>
+              <h3 className="text-lg font-bold mb-1.5">Choose what you’ll build today</h3>
               <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm mx-auto leading-relaxed">
-                This week is Balance week. Add business tasks when you're ready — they'll live here.
+                Your plate is empty. Choose existing tasks from All Tasks, or use Add Task to create one for today.
               </p>
               <button
-                onClick={() => setShowModal(true)}
+                onClick={() => setShowAllTasksDrawer(true)}
                 className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-accent text-white font-bold text-sm shadow-lg shadow-primary/20 hover:opacity-90 transition-all"
               >
                 <span className="material-symbols-outlined text-sm">add</span>
-                Add Business Task
+                Choose tasks
               </button>
             </div>
           )}
@@ -672,8 +677,8 @@ export default function TodayPage() {
             )}
             {tab === "Builder" && (
               <div className="flex flex-col gap-3">
-                {builderActionable.map((task) =>
-                  renderTaskCard(task, task.status === "TODAY", false)
+                {builderToday.map((task) =>
+                  renderTaskCard(task, true)
                 )}
               </div>
             )}
@@ -865,7 +870,7 @@ export default function TodayPage() {
         open={showModal}
         onClose={() => setShowModal(false)}
         defaultDomain={tab === "Builder" ? "BUSINESS" : "LIFE_ADMIN"}
-        addToTodayStack={tab === "Life"}
+        addToTodayStack
       />
 
       <LogTaskModal

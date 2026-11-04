@@ -12,6 +12,7 @@ import {
   invalidateTimerStateQuery,
   type Task,
   type Subtask,
+  getStartedTaskStatus,
   type TimerState,
 } from "../db";
 import { useTimerState as useTimerStateQuery } from "./useData";
@@ -309,7 +310,7 @@ export function useTimer() {
           await putTimerState(optimistic, { skipInvalidate: true });
           await updateTask(
             taskId,
-            { status: "IN_PROGRESS", updatedAt: now },
+            { status: getStartedTaskStatus(getCachedTask(userId, taskId)?.status ?? "BACKLOG"), updatedAt: now },
             { skipInvalidate: true }
           );
           invalidateTaskTimeQueriesForTask(userId, taskId);

@@ -9,7 +9,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   defaultDomain?: TaskDomain;
-  /** When true, new LIFE_ADMIN tasks get status TODAY so they show in the Today Stack */
+  /** When true, new tasks get status TODAY so they show in the Today Stack */
   addToTodayStack?: boolean;
 }
 
@@ -55,7 +55,7 @@ export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_A
       categoryId: catId,
       domain,
       title: title.trim(),
-      status: addToTodayStack && domain === "LIFE_ADMIN" ? "TODAY" : "BACKLOG",
+      status: addToTodayStack ? "TODAY" : "BACKLOG",
       priority: 2,
       timeTrackingMode: "PROJECT",
       estimateMinutes: estimate,
@@ -208,7 +208,7 @@ export default function QuickEntryModal({ open, onClose, defaultDomain = "LIFE_A
             className="w-full bg-gradient-accent text-white font-bold py-3 rounded-xl text-sm shadow-lg shadow-primary/25 hover:opacity-90 transition-all flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-lg">auto_awesome</span>
-            Add to Stack
+            {addToTodayStack ? "Add to Today" : "Add Task"}
           </button>
 
           <p className="text-center text-[11px] text-slate-400 italic">

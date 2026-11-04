@@ -102,7 +102,7 @@ export default function AllTasksView({ tab, embedded = false, onClose }: Props) 
       <p className="text-sm text-slate-500 dark:text-slate-400">
         {tab === "Life"
           ? "Pin tasks to add them to your Today Stack. Unpin to remove."
-          : "Pin tasks to prioritize them at the top of your Builder Queue."}
+          : "Choose Add to today to put a task on your Builder plate. Everything else stays here."}
       </p>
 
       <div className="flex flex-col gap-2">

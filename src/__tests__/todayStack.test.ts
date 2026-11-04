@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   scoreTask,
+  buildBuilderToday,
+  getStartedTaskStatus,
+  getTaskEstimateMinutes,
   buildStabilizerStack,
   buildStabilizerStackSplit,
   isWaiting,
@@ -678,5 +681,28 @@ describe("getEffectiveMinutes", () => {
   it("override of 0 minutes is respected", () => {
     const override: DailyCapacity = { id: "dc4", date: todayStr, domain: "LIFE_ADMIN", minutes: 0 };
     expect(getEffectiveMinutes(baseSettings, override, "LIFE_ADMIN")).toBe(0);
+  });
+});
+
+
+describe("explicit Builder Today selection", () => {
+  it("excludes backlog, old in-progress, pending, done, archived and Life tasks", () => {
+    const selected = makeTask({ domain: "BUSINESS", status: "TODAY", estimateMinutes: 60 });
+    const others = (["BACKLOG", "IN_PROGRESS", "PENDING", "DONE", "ARCHIVED"] as const)
+      .map(status => makeTask({ domain: "BUSINESS", status, estimateMinutes: 40 }));
+    const result = buildBuilderToday([...others, selected, makeTask({status: "TODAY"})]);
+    expect(result).toEqual([selected]);
+    expect(result.reduce((sum, task) => sum + getTaskEstimateMinutes(task), 0)).toBe(60);
+  });
+  it("adds and removes selections without auto-filling the empty plate", () => {
+    const task = makeTask({domain: "BUSINESS"});
+    expect(buildBuilderToday([task])).toEqual([]);
+    expect(buildBuilderToday([{...task,status:"TODAY"}])).toHaveLength(1);
+    expect(buildBuilderToday([{...task,status:"BACKLOG"}])).toEqual([]);
+  });
+  it("keeps a selected task on Today when its timer starts", () => {
+    const task = makeTask({domain:"BUSINESS",status:"TODAY"});
+    expect(buildBuilderToday([{...task,status:getStartedTaskStatus(task.status)}])).toHaveLength(1);
+    expect(getStartedTaskStatus("BACKLOG")).toBe("IN_PROGRESS");
   });
 });

@@ -433,6 +433,16 @@ export function buildStabilizerStackSplit(
   return { pinned, suggested };
 }
 
+/** Builder Today is an explicit selection, never an automatically filled backlog. */
+export function buildBuilderToday(tasks: Task[]): Task[] {
+  return tasks.filter((task) => task.domain === "BUSINESS" && task.status === "TODAY");
+}
+
+/** Starting a timer must not remove a task from its selected Today plate. */
+export function getStartedTaskStatus(status: TaskStatus): TaskStatus {
+  return status === "TODAY" ? "TODAY" : "IN_PROGRESS";
+}
+
 export function buildStabilizerStack(
   tasks: Task[],
   categories: Category[],
