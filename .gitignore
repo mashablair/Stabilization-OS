@@ -27,3 +27,6 @@ dist-ssr
 .env.local
 .env.development
 .env.production
+
+# Local data CLI session, backups, and private plans
+.balance-local/

@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "data": "node scripts/balance.mjs",
+    "test:data": "node --test scripts/balance-core.check.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",
