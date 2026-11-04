@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {migrateNorthStar} from './north-star.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +24,7 @@ const help = `Balance OS data tool (no browser required)
   subtask TASK_ID SUBTASK_ID done|open [--apply]
   archive ID [--apply]           Reversible removal; preserves history
   batch plan.json [--apply]      Add-only, deduplicated; never replaces existing rows
+  north-star plan.json [--apply] Save vision cards, verify, then archive source roadmap tasks
   snapshot                      Private local backup of all app tables
 Batch shape: {tasks:[{key,title,domain,category,subtasks:[{title,estimateMinutes}],...}],wins:[{key,text,date,tags}]}
 Session and snapshots are private, git-ignored files in .balance-local.
@@ -53,7 +55,7 @@ function password() {
     process.stdin.on('data',onData);
   });
 }
-const tables=['categories','tasks','time_entries','weekly_reviews','daily_capacity','wins','habits','habit_logs','app_settings','timer_state'];
+const tables=['north_star','categories','tasks','time_entries','weekly_reviews','daily_capacity','wins','habits','habit_logs','app_settings','timer_state'];
 let user;
 async function list(table) {
   if(!tables.includes(table)) throw Error('Unknown table');
@@ -64,8 +66,12 @@ async function get(table,id) { return unwrap(await client.from(table).select('*'
 function savePrivate(name,data) { const file=path.join(privateDir,`${Date.now()}-${name}.json`);fs.writeFileSync(file,JSON.stringify(data,null,2),{mode:0o600});return file; }
 async function snapshot() { const result={}; for(const t of tables)result[t]=await list(t);return savePrivate('snapshot',result); }
 async function patch(table,id,fields) {
-  if(!['tasks','wins'].includes(table))throw Error('Only tasks and wins can be updated');
-  validate(table,fields);
+  if(!['tasks','wins','north_star'].includes(table))throw Error('Unsupported update table');
+  if(table==='north_star') {
+    for(const k of Object.keys(fields))if(!['title','vision','why','ideas','domain','sort_order'].includes(k))throw Error('Unsupported vision field: '+k);
+    for(const k of ['title','vision'])if(k in fields&&!fields[k]?.trim())throw Error(k+' cannot be empty');
+    if(fields.domain&&!['BUSINESS','LIFE_ADMIN'].includes(fields.domain))throw Error('Invalid domain');
+  } else validate(table,fields);
   const before=await get(table,id);
   if(table==='tasks' && fields.status) {
     if(fields.status==='DONE')fields.completed_at=fields.completed_at??before.completed_at??new Date().toISOString();
@@ -79,9 +85,11 @@ async function patch(table,id,fields) {
   if(!apply)return;
   savePrivate('before-update',{table,before,fields});
   if(table==='tasks')fields.updated_at=new Date().toISOString();
+  if(table==='north_star')fields.revision=before.revision+1;
   let q=client.from(table).update(fields).eq('user_id',user.id).eq('id',id);
   // Reject stale edits; wins have no updated_at, so compare their mutable fields.
   if(table==='tasks')q=q.eq('updated_at',before.updated_at);
+  else if(table==='north_star')q=q.eq('revision',before.revision);
   else q=q.eq('text',before.text).eq('date',before.date).filter('tags','eq',`{${before.tags.join(',')}}`);
   const rows=unwrap(await q.select());
   if(rows.length!==1)throw Error('Record changed concurrently; read it again before retrying');
@@ -129,6 +137,7 @@ try {
     else if(command==='logout') {unwrap(await client.auth.signOut({scope:'local'}));console.log('CLI session signed out');}
     else if(command==='list')output(await list(args[0]));
     else if(command==='get')output(await get(args[0],args[1]));
+    else if(command==='north-star')await migrateNorthStar(client,user,read(args[0]),savePrivate,apply);
     else if(command==='snapshot')console.log(await snapshot());
     else if(command==='batch')await batch(read(args[0]));
     else if(command==='add') {if(!['tasks','wins'].includes(args[0]))throw Error('Only tasks or wins');await batch({[args[0]]:[read(args[1])]});}

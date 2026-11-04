@@ -8,7 +8,10 @@ import { rowToCategory, rowToTask, rowToTimeEntry, rowToWeeklyReview, rowToDaily
 import type { Habit, HabitLog } from "../habits";
 import type { Win } from "../db";
 
+import type { NorthStarCard } from "../northStar";
+
 interface ShareBundle {
+  northStar?: NorthStarCard[];
   meta: { version: string; exportedAt: string; timezone: string };
   categories: Category[];
   tasks: Task[];
@@ -80,7 +83,7 @@ export default function SettingsPage() {
   };
 
   const exportBundle = async () => {
-    const [catRes, taskRes, teRes, wrRes, dcRes, winsRes, habRes, hlRes, asRes] = await Promise.all([
+    const [catRes, taskRes, teRes, wrRes, dcRes, winsRes, habRes, hlRes, asRes, nsRes] = await Promise.all([
       supabase.from("categories").select("*"),
       supabase.from("tasks").select("*"),
       supabase.from("time_entries").select("*"),
@@ -90,9 +93,12 @@ export default function SettingsPage() {
       supabase.from("habits").select("*"),
       supabase.from("habit_logs").select("*"),
       supabase.from("app_settings").select("*").eq("id", "default").maybeSingle(),
+      supabase.from("north_star").select("*"),
     ]);
 
+    if (nsRes.error) { window.alert("Could not export North Star. Please try again."); return; }
     const bundle: ShareBundle = {
+      northStar: nsRes.data ?? [],
       meta: { version: "1.1.0", exportedAt: new Date().toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
       categories: (catRes.data ?? []).map(rowToCategory),
       tasks: (taskRes.data ?? []).map(rowToTask),
@@ -143,6 +149,10 @@ export default function SettingsPage() {
       }
       if (bundle.dailyCapacity) for (const dc of bundle.dailyCapacity) {
         await supabase.from("daily_capacity").insert({ id: dc.id, user_id: uid, date: dc.date, domain: dc.domain, minutes: dc.minutes });
+      }
+      if (bundle.northStar) for (const card of bundle.northStar) {
+        const {error} = await supabase.from("north_star").insert({...card, user_id:uid});
+        if(error) throw error;
       }
       if (bundle.wins) for (const w of bundle.wins) {
         await supabase.from("wins").insert({ id: w.id, user_id: uid, text: w.text, date: w.date, tags: w.tags, created_at: w.createdAt });

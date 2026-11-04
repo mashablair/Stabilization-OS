@@ -23,6 +23,7 @@ const logoSvg = (
 const navItems = [
   { to: "/", label: "Today", icon: "layers" },
   { to: "/today/all", label: "All Tasks", icon: "checklist" },
+  { to: "/north-star", label: "North Star", icon: "explore" },
   { to: "/dashboard", label: "Dashboard", icon: "grid_view" },
   { to: "/review", label: "Review", icon: "rate_review" },
   { to: "/wins", label: "Wins", icon: "emoji_events" },
@@ -52,7 +53,7 @@ export default function Layout() {
               </h1>
             </NavLink>
 
-            <nav className="hidden nav:flex items-center gap-6">
+            <nav className="hidden nav:flex items-center gap-4">
               {navItems.map((item) => (
                 <NavLink
                   key={item.to}
@@ -107,7 +108,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <nav className="hidden md:flex nav:hidden items-center gap-6 px-6 py-2 border-b border-slate-200 dark:border-border-dark bg-white/80 dark:bg-background-dark/80 backdrop-blur-md">
+        <nav className="hidden md:flex nav:hidden items-center gap-4 px-6 py-2 border-b border-slate-200 dark:border-border-dark bg-white/80 dark:bg-background-dark/80 backdrop-blur-md">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -134,14 +135,14 @@ export default function Layout() {
           <Outlet />
         </main>
 
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-slate-200 dark:border-border-dark flex justify-around py-2 z-50">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-slate-200 dark:border-border-dark flex justify-around overflow-x-auto py-2 z-50">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === "/"}
               className={({ isActive }) =>
-                `flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] font-medium ${
+                `flex flex-col items-center shrink-0 gap-0.5 px-2 py-1 text-[10px] font-medium ${
                   isActive
                     ? "text-primary"
                     : "text-slate-400"

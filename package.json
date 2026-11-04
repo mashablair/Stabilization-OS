@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "data": "node scripts/balance.mjs",
-    "test:data": "node --test scripts/balance-core.check.mjs"
+    "test:data": "node --test scripts/balance-core.check.mjs scripts/north-star.check.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",

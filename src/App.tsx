@@ -13,6 +13,7 @@ import WeeklyReviewPage from "./pages/WeeklyReviewPage";
 import SettingsPage from "./pages/SettingsPage";
 import AllTasksPage from "./pages/AllTasksPage";
 import WinsPage from "./pages/WinsPage";
+import NorthStarPage from "./pages/NorthStarPage";
 import HabitsPage from "./pages/HabitsPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
@@ -44,6 +45,7 @@ export default function App() {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/review" element={<WeeklyReviewPage />} />
                   <Route path="/wins" element={<WinsPage />} />
+                  <Route path="/north-star" element={<NorthStarPage />} />
                   <Route path="/habits" element={<HabitsPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />

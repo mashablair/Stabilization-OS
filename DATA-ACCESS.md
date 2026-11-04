@@ -31,3 +31,12 @@ npm run data -- update tasks TASK_ID /absolute/patch.json --apply
 Batch writes are sequential, not one transaction. A failed write stops the batch and prior successes remain. Deterministic IDs make retries safe. Local commands are serialized with `.balance-local/command.lock`; after a forcibly killed process, remove a stale lock only after confirming no CLI process remains active. User interface changes are still protected by optimistic update checks. Sessions and backups remain local to this checkout.
 
 Run `npm run test:data` to check deduplication, ownership-field rejection, date validation, and subtask transitions.
+
+
+## North Star
+
+Vision cards live in `north_star`, separate from tasks. Use `list north_star`, `get north_star ID`, and `update north_star ID patch.json --apply`. Updates support title, vision, why, ideas, domain, and sort_order, with revision-based concurrency protection.
+
+`north-star plan.json` previews an add-only card plan; `--apply` saves and verifies all cards before archiving any associated `Future —` source tasks. Each card has a stable id, kind (`vision` or `card`), title, vision, why, ideas, domain, source_task_id (or null), and sort_order. Existing differing cards stop the migration for review. Original source task contents and completion timestamps are preserved. Private plans remain in `.balance-local/`.
+
+Apply `supabase/migrations/003_north_star.sql` once through an authorized database administrator before using North Star. The normal app session cannot create tables. North Star content is included in app exports and CLI snapshots.

@@ -954,7 +954,7 @@ export async function deleteTimerState(options?: DbMutationOptions): Promise<voi
 
 export async function resetAllData(): Promise<void> {
   const tables = [
-    "timer_state", "time_entries", "habit_logs", "habits",
+    "north_star", "timer_state", "time_entries", "habit_logs", "habits",
     "wins", "daily_capacity", "weekly_reviews", "tasks",
     "categories", "app_settings",
   ];
@@ -964,6 +964,6 @@ export async function resetAllData(): Promise<void> {
   invalidate(
     "categories", "tasks", "timeEntries", "weeklyReviews",
     "timerState", "appSettings", "dailyCapacity", "wins",
-    "habits", "habitLogs"
+    "habits", "habitLogs", "northStar"
   );
 }

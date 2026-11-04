@@ -457,6 +457,9 @@ export default function TaskDetailPage() {
 
   return (
     <div className="max-w-7xl mx-auto w-full px-4 lg:px-8 py-4 pb-20 md:pb-4">
+      {task.notes?.match(/\/north-star#[a-zA-Z0-9-]+/) && (
+        <Link className="inline-flex text-sm text-primary mb-3 hover:underline" to={task.notes.match(/\/north-star#[a-zA-Z0-9-]+/)![0]}>← Back to the inspiring vision</Link>
+      )}
       <div className="nav:hidden flex items-center gap-2 mb-3 text-sm">
         <Link to={allTasksHref} className="text-slate-500 hover:text-primary">
           All Tasks
