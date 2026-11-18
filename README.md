@@ -1,106 +1,156 @@
 # Balance OS
 
-A Supabase-backed personal web app for managing life tasks with categories, subtasks, context prompts, time tracking, wins journaling, habits, and a progress dashboard. The UI uses local-first editing for text-heavy and numeric fields so typing stays instant while persistence happens on blur or explicit command-style actions.
+**A capacity-aware planning app that connects daily priorities, focused work, and long-term direction.**
 
-## How to Run
+Balance OS brings tasks, subtasks, time tracking, habits, and weekly reflection into one React application. Rather than treating the backlog as today's to-do list, it separates what could be done from what fits into the day.
 
-```bash
-npm install
-npm run dev
+Built by Maria Blair with AI-assisted development workflows. This repository is named `Stabilization-OS`; the product is **Balance OS**.
+
+**React 19 · TypeScript · Vite · Supabase · TanStack Query · Tailwind CSS 4 · Recharts**
+
+[Open the app](https://stabilization-os.pages.dev) · [Architecture](#architecture) · [Run locally](#run-locally) · [Tests](#tests) · [Design system](./design.md)
+
+## The product
+
+Two planning modes serve different needs:
+
+- **Life** suggests a small daily stack, taking priorities, waiting states, and remaining capacity into account.
+- **Builder** shows tasks explicitly selected for today, keeping the project backlog out of the day's allocated time.
+
+Both modes connect to subtasks, a focus timer, completed-work history, and progress reporting. Long-term ideas have their own **North Star** space so aspirations do not inflate today's workload.
+
+```mermaid
+flowchart LR
+  Backlog[Task backlog] --> Today[Today's selected work]
+  Today --> Focus[Subtasks and focus timer]
+  Focus --> Review[Dashboard and weekly review]
+  Review --> Today
+  Vision[North Star vision] -->|Create a next step| Backlog
+  Habits[Habit check-ins] --> History[Consistency and history]
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+*The deployed app requires sign-in. This diagram shows the workflow without exposing a personal workspace.*
 
-## Features
+## What you can do
 
-- **Today Stack** — Choose your daily role (Life / Builder). Life focuses on up to 5 tasks. Builder shows only tasks explicitly added to Today: use **Choose tasks → Add to today**, or **Add Task** to create a task directly on today’s plate. **Remove from today** returns it to All Tasks without losing progress. Backlog tasks do not count toward Builder’s allocated time, and starting a timer preserves a Today selection. **Quick Entry** uses a compact form: optional first subtask (defaults to **Main**), **project** time tracking, and the estimate on that subtask so the timer can start immediately from Today or task detail. Pin tasks you want; the algorithm suggests the rest. **Log Task** records a task you already completed (e.g. "reviewed documents" in Builder, 10 min) without prior planning — it appears in Done Today and counts toward your time. Mark tasks done with the ✓ checkmark icon next to each task. **Time Capacity** shows a three-segment bar: time spent today (green), allocated to your stack (purple), and breathing room (grey). Adjust capacity per day with the tune icon — changes apply to today only, with separate budgets for Life and Builder. The algorithm uses remaining capacity (capacity minus time spent) when suggesting tasks, so it won’t over-fill your stack after you complete longer tasks. A collapsible **Done Today** section celebrates completed tasks and individually completed subtasks with motivational messages — partial progress on multi-subtask tasks shows up the day the subtask is checked off, not just when the whole task is done. **Log a win** to record accomplishments beyond your task list (e.g. started building this app, did a face mask).
-- **All Tasks** — Dedicated page (main nav) to browse all active tasks by domain, with a **Log Task** button to record completed tasks retroactively. Collapsible **Pending** section (tasks waiting on a future action date) and **Done** section containing **Completed** and **Archived** tabs. Archive tasks to declutter without losing history.
-- **Categories** — Domain-specific categories. **Life:** LEGAL, MONEY, MAINTENANCE, CAREGIVER. **Builder (Business):** LEGAL, CONTENT, PRODUCT, NETWORKING, LEARNING, OPS. Show/hide default categories on the Categories page; add up to 5 custom categories with name and domain. Overview cards show why each category matters; the detail page includes win condition and script.
-- **Task Detail** — Click the task name to edit it (display/edit mode prevents cursor jumping). Textareas and number-heavy fields now edit against local draft state and commit on blur, so typing stays smooth without per-keystroke Supabase writes. Click/toggle/status actions still save immediately. Subtasks auto-complete the task when all are done. Context cards (why / next micro-step / reframe), priority, due dates, money impact, notes, and waiting fields are all supported. Tasks track a `completedAt` timestamp for accurate reporting. All tasks use **project-style time tracking**: estimates and actual time live on each subtask and are summed at the task level. Every task has at least one subtask (a **Main** subtask is created automatically when needed). The last subtask cannot be deleted.
-- **Focus Timer** — Start/pause/stop timer per subtask; persisted in Supabase so page refresh won't lose time. **Add time** manually (minutes or `h:mm`) when you forget to start the timer; remove sessions from history via the × button. Session history and total update live. The Today page defaults to the first subtask with a "Change subtask" picker.
-- **Dashboard** — Weekly stats (tasks completed, subtasks completed, time tracked, money recovered, open loops), time allocation chart, open loops trend, friction log. Filter by **All**, **Life**, or **Builder** to view stats per domain. Chart tooltips adapt to light/dark mode for readable contrast.
-- **North Star** — A separate vision board with an editable guiding statement and cards for long-term aspirations. Cards hold a vision, why it matters, and ideas, without task deadlines or capacity totals. Create a next step when ready; it becomes a linked backlog task. Requires migration `003_north_star.sql`.
-- **Wins** — A dedicated page to log and browse accomplishments beyond your tracked tasks. Tag wins with life, biz, vitality, or community. Browse by week, month, quarter, or year. Quick-add from the Today page footer. Revisit during quarterly reviews or when you need a boost.
-- **Habits** — Dedicated habits tracker with a fast **Today** strip, one-tap logging (Done / optional Partial / Skip), and compact history views for **Week**, **Month**, and **3 Months**. Numeric values and notes now buffer locally while you type and commit on blur; one-tap status buttons and +/- controls still save immediately. **Time of day** groups habits into Morning / Anytime / Evening (default Anytime); Today shows collapsible sections (Morning expanded by default) for faster routine logging. History heatmap includes a filter: All / Morning / Anytime / Evening. Day Editor with prev/next navigation for fast backfills, consistency-first stats, streak as secondary, schedule types (daily, weekdays, every N days, X times/week), plus color/icon customization, reordering, and archiving.
-- **Weekly Review** — Guided wizard that starts with a **Wins** step highlighting completed tasks, time invested, money recovered, and **other wins** you logged this week, followed by estimate mismatches, friction reflection, category focus, and smallest next step
-- **Settings** — Configure default daily capacity for Life and Builder with local draft number inputs that save on blur, export/import JSON share bundles (includes categories, tasks, wins, habits, habit logs, app settings, time entries, weekly reviews, daily capacity), CSV exports (tasks + time entries), dark mode toggle, data reset. Accessible via the gear icon in the header.
+| Area | Workflow |
+| --- | --- |
+| Daily planning | Select work, pin priorities, adjust each mode's daily capacity, and compare time spent, allocated time, and remaining room. |
+| Task management | Organize tasks by category, break work into subtasks, record context and next actions, and move items between backlog, today, pending, done, and archived states. |
+| Time tracking | Start, pause, and stop subtask timers; record missed time manually; review session history. Timer state is persisted. |
+| Habits | Log Done, Partial, or Skip; group routines by time of day; explore weekly, monthly, and three-month history. |
+| Reflection | Log wins independently of tasks and complete a guided weekly review of progress, estimates, and friction. |
+| Reporting | View completion and tracked-time metrics, allocation charts, and open-loop trends, filtered by Life or Builder. |
+| Long-term direction | Keep vision cards separate from actionable tasks and create linked next steps when ready. |
+| Portability | Export JSON bundles and CSV task/time summaries from Settings. |
 
-## Data Storage
+## Engineering highlights
 
-App data is stored in Supabase and queried with React Query. The app still follows a local-first editing pattern for text-heavy and numeric UI so in-progress edits do not block on network writes or get overwritten by fresh query data.
+### Responsive editing without a write on every keystroke
 
-Primary tables include:
-- `categories`
-- `tasks`
-- `time_entries`
-- `weekly_reviews`
-- `daily_capacity`
-- `wins`
-- `habits`
-- `habit_logs`
-- `app_settings`
-- `timer_state`
+Text-heavy and numeric forms keep a local draft while the user types and save on blur or an explicit action. Task detail tracks dirty fields so query refreshes can update other values without replacing in-progress edits. This is a local editing pattern over server-backed data, **not an offline-sync engine**.
 
-## Export / Import
+### Task state and time are related, but not interchangeable
 
-1. Go to **Settings**
-2. Click **Export .json Bundle** to download all your data (including wins, habits, habit logs, and all other data)
-3. To restore, click **Choose .json file** under Import — this overwrites all data
-4. CSV exports are also available for `tasks_summary.csv` and `time_entries.csv`
+Estimates and recorded time are attached to subtasks and rolled up to the task. Every task retains at least one subtask. Partial subtask completions appear in daily progress even before the parent task is complete. Removing a task from today does not erase its history.
 
-## Seed Data
+### Server state and identity have explicit boundaries
 
-On first run, the app automatically creates 4 Life categories (LEGAL, MONEY, MAINTENANCE, CAREGIVER), 6 Builder categories (LEGAL, CONTENT, PRODUCT, NETWORKING, LEARNING, OPS), and 1 sample Life task. To re-seed, use the **Reset All Data** option in Settings and reload the page.
+TanStack Query manages fetched application state. Supabase handles authentication and persistence; authenticated routes are grouped behind `ProtectedRoute`. Database migrations define user-owned rows and row-level policies. 
 
-## Task Lifecycle
+### Compact, intentional UI
 
-Tasks flow through these statuses: **BACKLOG** → **TODAY** → **IN_PROGRESS** → **DONE** → **ARCHIVED**. Tasks can also be set to **PENDING** (waiting) with an optional future action date. Completing all subtasks on a task automatically marks it as DONE. Undoing a completion always returns the task to BACKLOG.
+The interface favors data density, clear primary actions, and shared light/dark tokens rather than oversized dashboard cards. [The design system](./design.md) documents the visual language and component conventions.
 
-## Testing
+## Architecture
 
-```bash
-npm test
+```text
+React Router pages and UI components
+        │
+        ├── Local form drafts and interaction state
+        ├── TanStack Query hooks (server reads)
+        └── Domain operations and timer hooks
+                         │
+                 Supabase Auth + database
 ```
 
-Tests use Vitest. `todayStack.test.ts` covers stack-building logic, actionable/waiting states, archived behaviour, and daily capacity overrides. `habits.test.ts` covers habit scheduling, consistency/streak metrics, and habit log behavior.
+Useful starting points:
 
-## Design
+| Path | Purpose |
+| --- | --- |
+| [`src/App.tsx`](./src/App.tsx) | Providers, public authentication routes, protected application routes |
+| [`src/pages/TodayPage.tsx`](./src/pages/TodayPage.tsx) | Life/Builder selection, capacity, daily work, and completion views |
+| [`src/pages/TaskDetailPage.tsx`](./src/pages/TaskDetailPage.tsx) | Draft editing, subtasks, status changes, and time history |
+| [`src/hooks/useData.ts`](./src/hooks/useData.ts) | Query hooks and database-to-application mapping |
+| [`src/db.ts`](./src/db.ts) | Task types and domain operations |
+| [`src/habits.ts`](./src/habits.ts) | Habit scheduling and history logic |
+| [`supabase/migrations`](./supabase/migrations) | Database schema and policies |
+| [`src/__tests__`](./src/__tests__) | Daily-stack and habit tests |
+| [`DATA-ACCESS.md`](./DATA-ACCESS.md) | Authenticated data CLI, previews, and safe operational workflow |
 
-UI conventions, **compact / data-dense** defaults, color tokens, and dark mode live in **[design.md](./design.md)**. Tokens are defined in `src/index.css` (`@theme`).
+## Run locally
 
-## Tech Stack
-
-- Vite + React + TypeScript
-- Tailwind CSS v4
-- Supabase
-- TanStack Query
-- Recharts (charts)
-- React Router v7
-- Vitest (testing)
-
-## Environment Variables
-
-Set the Supabase client vars in a local `.env` file:
-
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-
-If you add other client-side configuration, use `VITE_`-prefixed variables so Vite exposes them to the app.
-
-## Building for Production
+Use a current Node.js LTS release and npm. Node.js 22 or later also supports the data CLI's environment-file loading.
 
 ```bash
-npm run build
-npm run preview
+git clone https://github.com/mashablair/Stabilization-OS.git
+cd Stabilization-OS
+npm ci
 ```
+
+1. Prepare **your own development Supabase project**, not an existing personal workspace.
+2. Apply the SQL files in [`supabase/migrations`](./supabase/migrations) in numeric order. `001_initial_schema.sql` creates the base tables; `002_add_timezone.sql` adds timezone settings; `003_north_star.sql` adds the vision board.
+3. Create a local `.env` file:
+
+   ```dotenv
+   VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+   VITE_SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
+   ```
+
+   Vite exposes `VITE_` variables to the browser. Never put a Supabase service-role key, password, or other secret in them. The local `.env` files are git-ignored.
+4. Configure Supabase Auth for your development URL and password-reset redirect, then start the app:
+
+   ```bash
+   npm run dev
+   ```
+
+5. Open [localhost:5173](http://localhost:5173) and use your own development account. Use fictional tasks for testing or screenshots.
+
+The app seeds default Life and Builder categories and an initial sample task for a new workspace. This is not a credential-free public demo.
+
+## Tests
+
+The domain tests import the Supabase client but do not need a live database. For a fresh checkout without `.env`, supply local placeholder configuration:
+
+```bash
+VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=local-test-placeholder npm test
+```
+
+
+```bash
+npm test            # Vitest: daily-stack and habit logic
+npm run test:data   # Node tests: data-tool validation and North Star migration behavior
+npm run lint        # ESLint
+npm run build       # TypeScript project build + Vite production bundle
+npm run preview     # Serve the built bundle locally
+```
+
+The test suites cover scheduling, capacity overrides, waiting/archived states, habit consistency, stable batch IDs, and preservation of existing records during the data-tool workflow. See [verification notes](docs/PORTFOLIO_CHECK.md) for the latest checks and authenticated-flow limitations.
+
+## Data and operational notes
+
+Primary data includes categories, tasks and their subtasks, time entries, daily capacity, timer state, wins, habits and logs, weekly reviews, settings, and North Star cards.
+
+- **Task lifecycle:** `BACKLOG` → `TODAY` → `IN_PROGRESS` → `DONE` → `ARCHIVED`, with `PENDING` for waiting work. Completing all subtasks completes the parent task; undoing completion returns it to the backlog.
+- **Exports:** Settings provides a JSON bundle and CSV summaries. Check the exported bundle's contents before relying on it as a complete backup, especially for newer features.
+- **Import/reset caution:** Settings import replaces data, and reset is destructive. Do not use either on a real workspace just to try the app. Prefer an isolated development project.
+- **CLI:** `npm run data -- --help` lists supported commands. Read [DATA-ACCESS.md](./DATA-ACCESS.md) before using it. Mutations preview by default and require `--apply`; private sessions and snapshots stay in ignored `.balance-local/`.
+- **Privacy:** Do not commit workspace exports, personal plans, credentials, or screenshots containing real records.
 
 ## Deploy to Cloudflare Pages
 
-1. Connect your repo to [Cloudflare Pages](https://pages.cloudflare.com).
-2. Configure the project:
-   - **Build command:** `npm run build`
-   - **Output directory:** `dist`
-   - **Root directory:** (leave empty if project root)
-3. **Node version:** Use Node.js 18 or later (set via Environment Variables in Cloudflare dashboard: `NODE_VERSION` = `18`).
-4. **SPA routing:** The `public/_redirects` file configures Cloudflare Pages to serve `index.html` for all routes (status 200), so deep links and page refreshes work. Unknown routes redirect to the homepage.
-5. **Custom domain:** In your Cloudflare Pages project, go to **Custom domains** → **Set up a custom domain** and follow the steps to add your domain.
+Build the repository root with `npm run build` and publish `dist`. Configure the two public Supabase client variables in the build environment, use a supported Node.js LTS version, and configure Supabase Auth URLs for the deployed origin.
+
+[`public/_redirects`](./public/_redirects) serves `index.html` for client-side routes so deep links and refreshes reach React Router. A custom domain can be configured through the Pages project.
+
+Deployment requires your own backend configuration. Publishing the frontend alone does not provision the database or validate its access policies.
