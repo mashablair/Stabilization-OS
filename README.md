@@ -8,7 +8,7 @@ Built by Maria Blair with AI-assisted development workflows. This repository is 
 
 **React 19 · TypeScript · Vite · Supabase · TanStack Query · Tailwind CSS 4 · Recharts**
 
-[Architecture](#architecture) · [Run locally](#run-locally) · [Tests](#tests) · [Design system](./design.md)
+[Open the app](https://stabilization-os.pages.dev) · [Architecture](#architecture) · [Run locally](#run-locally) · [Tests](#tests) · [Design system](./design.md)
 
 ## The product
 
@@ -29,7 +29,7 @@ flowchart LR
   Habits[Habit check-ins] --> History[Consistency and history]
 ```
 
-*Product-flow diagram, not an application screenshot. The app requires authentication; this README does not expose a personal workspace or its records.*
+*The deployed app requires sign-in. This diagram shows the workflow without exposing a personal workspace.*
 
 ## What you can do
 
@@ -56,7 +56,7 @@ Estimates and recorded time are attached to subtasks and rolled up to the task. 
 
 ### Server state and identity have explicit boundaries
 
-TanStack Query manages fetched application state. Supabase handles authentication and persistence; authenticated routes are grouped behind `ProtectedRoute`. Database migrations define user-owned rows and row-level policies. These are implementation mechanisms, not a claim of an independent security audit.
+TanStack Query manages fetched application state. Supabase handles authentication and persistence; authenticated routes are grouped behind `ProtectedRoute`. Database migrations define user-owned rows and row-level policies. 
 
 ### Compact, intentional UI
 
@@ -120,6 +120,13 @@ The app seeds default Life and Builder categories and an initial sample task for
 
 ## Tests
 
+The domain tests import the Supabase client but do not need a live database. For a fresh checkout without `.env`, supply local placeholder configuration:
+
+```bash
+VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=local-test-placeholder npm test
+```
+
+
 ```bash
 npm test            # Vitest: daily-stack and habit logic
 npm run test:data   # Node tests: data-tool validation and North Star migration behavior
@@ -128,7 +135,7 @@ npm run build       # TypeScript project build + Vite production bundle
 npm run preview     # Serve the built bundle locally
 ```
 
-The test suites cover scheduling, capacity overrides, waiting/archived states, habit consistency, stable batch IDs, and preservation of existing records during the data-tool workflow. Running these tests is not a substitute for verifying a deployed database or end-to-end authentication.
+The test suites cover scheduling, capacity overrides, waiting/archived states, habit consistency, stable batch IDs, and preservation of existing records during the data-tool workflow. See [verification notes](docs/PORTFOLIO_CHECK.md) for the latest checks and authenticated-flow limitations.
 
 ## Data and operational notes
 
